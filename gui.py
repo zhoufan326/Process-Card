@@ -1,0 +1,502 @@
+r"""Process Card — 流程卡片管理系统。
+中式古典简约风格界面。
+
+布局:
+┌────────────────────────────────────────────┐
+│  ■ Process Card    流程卡片                │
+├────────────────────────────────────────────┤
+│  ■ 项目文件  [preset.json ▾] [加载][保存][浏览] │
+├──────────────┬─────────────────────────────┤
+│  表单区       │                             │
+│  车间/名称/  │      Treeview 主数据区       │
+│  对象/要求   │                             │
+│  [保存][新建]│                             │
+│  [+要求][删除]│                            │
+│  [导出Excel] │                             │
+├──────────────┴─────────────────────────────┤
+│  ■ 就绪                                    │
+└────────────────────────────────────────────┘
+"""
+
+import os
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+
+from set import TaskGroup, Tasks, load_preset, save_preset
+from tree_drag_controller import TreeDragController
+from file_manager import FileManager
+
+# ──────────────────────────────────────────────
+# 中式古典配色
+# ──────────────────────────────────────────────
+
+CLR_PAPER = "#F5F0E8"     # 宣纸底色 – 全局背景
+CLR_PANEL = "#FDF8F2"     # 面板底色 – 稍浅
+CLR_HEADER = "#E8D5B7"    # 标题栏 – 暖沙色
+CLR_BORDER = "#D3C1AD"    # 分隔线 – 淡茶色
+CLR_TEXT = "#3E2723"      # 正文 – 深墨色
+CLR_SUBTEXT = "#5D4037"   # 辅助文字 – 焦茶色
+CLR_ACCENT = "#8D6E63"    # 按钮主色 – 驼棕色
+CLR_ACCENT_HI = "#6D4C41" # 按钮悬停 – 深棕
+CLR_SECOND = "#A1887F"    # 按钮次色
+CLR_LIGHT = "#D7CCC8"     # 按钮浅色
+CLR_TREE_GROUP = "#EDE0D4"  # Treeview 组行 – 浅砂
+CLR_TREE_REQ = "#FDF8F2"    # Treeview 子行 – 米白
+CLR_TREE_SEL = "#D4E6C3"    # 选中行 – 青瓷绿
+
+TAG_GROUP = "group"
+TAG_REQ = "req"
+PAD_X = 12
+PAD_Y = 4
+FONT = "Microsoft YaHei"
+
+
+# ──────────────────────────────────────────────
+# 辅助函数
+# ──────────────────────────────────────────────
+
+def _btn(parent, text, command, *, color=CLR_ACCENT, fg="white", width=9, **kw):
+    """创建风格统一的按钮。"""
+    return tk.Button(
+        parent, text=text, command=command, width=width,
+        font=(FONT, 9), bg=color, fg=fg,
+        relief="flat", cursor="hand2", bd=0,
+        activebackground=CLR_ACCENT_HI, activeforeground="white",
+        **kw,
+    )
+
+
+def _sep(parent, row, colspan=2, pady=6):
+    """横向分隔线。"""
+    s = tk.Frame(parent, height=1, bg=CLR_BORDER)
+    s.grid(row=row, column=0, columnspan=colspan, sticky="ew", padx=PAD_X, pady=pady)
+    s.grid_propagate(False)
+
+
+# ──────────────────────────────────────────────
+# 主应用
+# ──────────────────────────────────────────────
+
+class TaskApp:
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self._edit_group_idx: int | None = None
+        self._edit_req_idx: int = -1
+
+        self._init_style()
+        self._build_header()
+        self._build_file_bar()
+        self._build_body()
+        self._build_footer()
+        self._init_drag_ctrl()
+        self._bind_events()
+        self._file_mgr.refresh_file_list()
+        self._refresh_tree()
+        self.bay_entry.focus_set()
+
+    # ── 全局样式 ──────────────────────────────
+
+    def _init_style(self):
+        self.root.configure(bg=CLR_PAPER)
+        self.root.title("Process Card · 流程管理")
+        self.root.geometry("960x580")
+        self.root.minsize(780, 440)
+        self.root.resizable(True, True)
+        self.root.grid_columnconfigure(1, weight=3)
+        self.root.grid_rowconfigure(2, weight=1)
+
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Treeview",
+                        background=CLR_TREE_REQ,
+                        fieldbackground=CLR_TREE_REQ,
+                        foreground=CLR_TEXT,
+                        font=(FONT, 9))
+        style.configure("Treeview.Heading",
+                        background=CLR_HEADER,
+                        foreground=CLR_TEXT,
+                        font=(FONT, 9, "bold"))
+        style.map("Treeview",
+                  background=[("selected", CLR_TREE_SEL)],
+                  foreground=[("selected", CLR_TEXT)])
+
+    # ── 标题栏 ────────────────────────────────
+
+    def _build_header(self):
+        h = tk.Frame(self.root, bg=CLR_HEADER, height=36)
+        h.grid(row=0, column=0, columnspan=2, sticky="ew")
+        h.grid_propagate(False)
+        tk.Label(
+            h, text=chr(0x25A0) + "  Process Card  —  流程卡片管理",
+            font=(FONT, 12, "bold"), fg=CLR_TEXT, bg=CLR_HEADER,
+        ).pack(side="left", padx=14, pady=6)
+
+    # ── 文件管理栏 ────────────────────────────
+
+    def _build_file_bar(self):
+        fb = tk.Frame(self.root, bg=CLR_PAPER, height=40)
+        fb.grid(row=1, column=0, columnspan=2, sticky="ew", padx=PAD_X, pady=(PAD_Y, 0))
+        fb.grid_propagate(False)
+
+        self._file_mgr = FileManager(
+            fb,
+            script_dir=os.path.dirname(os.path.abspath(__file__)),
+            on_load=self._do_load,
+            on_save=self._do_save,
+            set_status=self._set_status,
+            bg=CLR_PAPER,
+        )
+        self._file_mgr.pack(fill="x", expand=True)
+
+    # ── 主体区域 ──────────────────────────────
+
+    def _build_body(self):
+        # — 左侧表单面板 —
+        left = tk.Frame(self.root, bg=CLR_PANEL, bd=0,
+                        highlightbackground=CLR_BORDER, highlightthickness=1)
+        left.grid(row=2, column=0, sticky="nsew", padx=(PAD_X, 0), pady=PAD_Y)
+
+        self._build_form(left)
+        _sep(left, 7)
+        self._build_buttons(left)
+
+        # — 右侧 Treeview —
+        tvf = tk.Frame(self.root, bg=CLR_PAPER)
+        tvf.grid(row=2, column=1, sticky="nsew", padx=PAD_X, pady=PAD_Y)
+
+        columns = ("bay", "process", "obj", "require")
+        self.tree = ttk.Treeview(tvf, columns=columns, show="tree headings", height=16)
+        self.tree.heading("#0", text="")
+        self.tree.heading("bay", text="车间")
+        self.tree.heading("process", text="工序")
+        self.tree.heading("obj", text="对象")
+        self.tree.heading("require", text="要求")
+        self.tree.column("#0", width=0, stretch=False)
+        self.tree.column("bay", width=60, anchor="center")
+        self.tree.column("process", width=80)
+        self.tree.column("obj", width=50, anchor="center")
+        self.tree.column("require", width=350)
+        self.tree.pack(fill="both", expand=True)
+
+    def _build_form(self, parent):
+        """构建古典风格的标签-输入框表单。"""
+        frm = tk.Frame(parent, bg=CLR_PANEL)
+        frm.grid(row=0, column=0, sticky="ew", padx=14, pady=(12, 0))
+        frm.grid_columnconfigure(1, weight=1)
+
+        fields = [
+            (0, "车 间", "bay_entry"),
+            (1, "工 序", "process_entry"),
+            (2, "对 象", "obj_entry"),
+            (3, "要 求", "req_entry"),
+        ]
+        for row, label_text, attr in fields:
+            tk.Label(
+                frm, text=label_text, font=(FONT, 10, "bold"),
+                fg=CLR_SUBTEXT, bg=CLR_PANEL, width=6, anchor="e",
+            ).grid(row=row, column=0, padx=(0, 6), pady=PAD_Y, sticky="e")
+            ent = tk.Entry(
+                frm, font=(FONT, 10), width=22,
+                bg="white", fg=CLR_TEXT, relief="solid", bd=1,
+                insertbackground=CLR_ACCENT,
+            )
+            ent.grid(row=row, column=1, sticky="ew", pady=PAD_Y)
+            setattr(self, attr, ent)
+
+    def _build_buttons(self, parent):
+        """按钮组：两行排列。"""
+        bf = tk.Frame(parent, bg=CLR_PANEL)
+        bf.grid(row=8, column=0, sticky="ew", padx=14, pady=(0, 10))
+
+        self.save_btn = _btn(bf, "保存组", self._on_save, width=9)
+        self.save_btn.grid(row=0, column=0, padx=2, pady=2)
+        _btn(bf, "新建组", self._on_new, color=CLR_SECOND, width=9).grid(row=0, column=1, padx=2, pady=2)
+
+        _btn(bf, "+ 要求", self._on_add_req, color=CLR_LIGHT, fg=CLR_SUBTEXT, width=9).grid(row=1, column=0, padx=2, pady=2)
+        _btn(bf, "删 除", self._on_delete, color=CLR_LIGHT, fg=CLR_SUBTEXT, width=9).grid(row=1, column=1, padx=2, pady=2)
+
+        _btn(bf, "导出工艺卡", self._on_export, color=CLR_HEADER, fg=CLR_TEXT, width=20).grid(
+            row=2, column=0, columnspan=2, padx=2, pady=(6, 2), sticky="ew"
+        )
+        _btn(bf, "工艺计算", self._on_process_calc, color=CLR_ACCENT, fg="white", width=20).grid(
+            row=3, column=0, columnspan=2, padx=2, pady=2, sticky="ew"
+        )
+
+    # ── 底部状态栏 ────────────────────────────
+
+    def _build_footer(self):
+        ft = tk.Frame(self.root, bg=CLR_HEADER, height=28)
+        ft.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(PAD_Y, 0))
+        ft.grid_propagate(False)
+        self.status_var = tk.StringVar(value="就绪")
+        tk.Label(
+            ft, textvariable=self.status_var, anchor="w",
+            font=(FONT, 9), fg=CLR_SUBTEXT, bg=CLR_HEADER,
+        ).pack(side="left", padx=14, pady=4)
+
+    # ── 拖拽控制器 ────────────────────────────
+
+    def _init_drag_ctrl(self):
+        self._drag_ctrl = TreeDragController(
+            self.tree,
+            is_draggable=lambda item: item.startswith("g") and "_" not in item,
+            on_select=self._on_tree_select,
+            on_move=self._on_move_group,
+            set_status=self._set_status,
+        )
+
+    # ── 事件绑定 ──────────────────────────────
+
+    def _bind_events(self):
+        self.tree.bind("<Double-1>", self._on_tree_double)
+        self.root.bind("<Return>", lambda e: self._on_save())
+        self.root.bind("<Escape>", lambda e: self._on_new())
+        self.root.bind("<Delete>", lambda e: self._on_delete())
+
+    # ── 状态反馈 ──────────────────────────────
+
+    def _set_status(self, msg: str):
+        self.status_var.set(msg)
+
+    # ── 文件管理回调 ──────────────────────────
+
+    def _do_load(self, path: str):
+        """FileManager 的加载回调：清空状态，加载并刷新。"""
+        self._edit_group_idx = None
+        self._edit_req_idx = -1
+        self._clear_inputs()
+        self.save_btn.config(text="保存组")
+        load_preset(path)
+        self._refresh_tree()
+        name = os.path.basename(path)
+        self._set_status(f"已加载 {len(Tasks)} 组（{name}）")
+
+    def _do_save(self, path: str):
+        """FileManager 的保存回调：将 Tasks 写入文件。"""
+        save_preset(path)
+
+    # ── 输入框操作 ────────────────────────────
+
+    def _fill_inputs(self, bay="", process="", obj="", req=""):
+        for ent, val in [
+            (self.bay_entry, bay), (self.process_entry, process),
+            (self.obj_entry, obj), (self.req_entry, req),
+        ]:
+            ent.delete(0, tk.END)
+            ent.insert(0, val)
+
+    def _clear_inputs(self):
+        self._fill_inputs()
+
+    # ── 组拖拽 ────────────────────────────────
+
+    def _on_move_group(self, src: int, tgt: int):
+        group = Tasks.pop(src)
+        Tasks.insert(tgt, group)
+        if self._edit_group_idx is not None:
+            if self._edit_group_idx == src:
+                self._edit_group_idx = tgt
+            elif self._edit_group_idx == tgt:
+                self._edit_group_idx = src
+        self._refresh_tree()
+        self._set_status(f"已移动组 [{tgt + 1}] {group.process}")
+
+    # ── Treeview 操作 ─────────────────────────
+
+    @staticmethod
+    def _group_item_id(gi: int) -> str:
+        return f"g{gi}"
+
+    @staticmethod
+    def _req_item_id(gi: int, ri: int) -> str:
+        return f"g{gi}_r{ri}"
+
+    def _get_group_by_item(self, item: str) -> tuple[int, int] | None:
+        if not item:
+            return None
+        for gi, g in enumerate(Tasks):
+            if item == self._group_item_id(gi):
+                return (gi, -1)
+            for ri in range(len(g.requires)):
+                if item == self._req_item_id(gi, ri):
+                    return (gi, ri)
+        return None
+
+    def _refresh_tree(self):
+        tree = self.tree
+        for item in tree.get_children():
+            tree.delete(item)
+        for gi, g in enumerate(Tasks):
+            gid = self._group_item_id(gi)
+            tree.insert(
+                "", "end", iid=gid,
+                values=(g.bay, g.process, g.obj, f"{len(g.requires)} 项"),
+                tags=(TAG_GROUP,),
+            )
+            for ri, req in enumerate(g.requires):
+                tree.insert(
+                    gid, "end", iid=self._req_item_id(gi, ri),
+                    values=("", "", "", req),
+                    tags=(TAG_REQ,),
+                )
+        tree.tag_configure(TAG_GROUP, background=CLR_TREE_GROUP,
+                           font=(FONT, 9, "bold"))
+        tree.tag_configure(TAG_REQ, background=CLR_TREE_REQ,
+                           font=(FONT, 9))
+        for item in tree.get_children():
+            tree.item(item, open=True)
+
+    # ── 选择与编辑 ────────────────────────────
+
+    def _on_tree_select(self, item=None):
+        if item is None:
+            sel = self.tree.selection()
+            if not sel:
+                return
+            item = sel[0]
+        info = self._get_group_by_item(item)
+        if info is None:
+            return
+        gi, ri = info
+        g = Tasks[gi]
+        if ri == -1:
+            self._edit_group_idx = gi
+            self._edit_req_idx = -1
+            self._fill_inputs(g.bay, g.process, g.obj, "")
+            self.save_btn.config(text="保存组")
+            self._set_status(f"选中组 [{gi + 1}] {g.process}")
+        else:
+            self._edit_group_idx = gi
+            self._edit_req_idx = ri
+            self._fill_inputs(g.bay, g.process, g.obj, g.requires[ri])
+            self.save_btn.config(text="保存修改")
+            self._set_status(f"选中 {g.process} → 要求 {ri + 1}")
+
+    def _on_tree_double(self, event=None):
+        self._on_tree_select()
+        self.req_entry.focus_set()
+
+    # ── 保存 / 新建 / 添加 / 删除 ────────────
+
+    def _on_save(self):
+        bay = self.bay_entry.get().strip()
+        process = self.process_entry.get().strip()
+        obj = self.obj_entry.get().strip()
+        req = self.req_entry.get().strip()
+
+        if not process:
+            messagebox.showwarning("输入不完整", "工序 (Process) 为必填项。")
+            return
+
+        if self._edit_group_idx is not None:
+            g = Tasks[self._edit_group_idx]
+            g.bay, g.process, g.obj = bay, process, obj
+            if self._edit_req_idx >= 0:
+                if req:
+                    g.requires[self._edit_req_idx] = req
+                else:
+                    g.requires.pop(self._edit_req_idx)
+            elif req:
+                g.requires.append(req)
+            self._clear_inputs()
+            self._edit_group_idx, self._edit_req_idx = None, -1
+            self.save_btn.config(text="保存组")
+            self._set_status(f"已保存组 {process}")
+        else:
+            Tasks.append(TaskGroup(bay=bay, process=process, obj=obj,
+                                   requires=[req] if req else []))
+            self._clear_inputs()
+            self._set_status(f"已添加新组 {process}")
+        self._refresh_tree()
+
+    def _on_new(self):
+        self._edit_group_idx, self._edit_req_idx = None, -1
+        self._clear_inputs()
+        self.save_btn.config(text="保存组")
+        self.bay_entry.focus_set()
+        self._set_status("新建模式")
+
+    def _on_add_req(self):
+        if self._edit_group_idx is not None:
+            g = Tasks[self._edit_group_idx]
+            g.requires.append("")
+            self._edit_req_idx = len(g.requires) - 1
+            self._fill_inputs(g.bay, g.process, g.obj, "")
+            self.req_entry.focus_set()
+            self.save_btn.config(text="保存修改")
+            self._refresh_tree()
+            self._set_status(f"已添加空要求到组 {g.process}，请编辑")
+        else:
+            messagebox.showinfo("提示", "请先选中一个组。")
+
+    def _on_delete(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo("删除提示", "请先选中要删除的项。")
+            return
+        info = self._get_group_by_item(sel[0])
+        if info is None:
+            return
+        gi, ri = info
+        if ri == -1:
+            if not messagebox.askyesno("确认删除", f"确定删除组 [{gi + 1}] {Tasks[gi].process}？"):
+                return
+            Tasks.pop(gi)
+        else:
+            g = Tasks[gi]
+            if not messagebox.askyesno("确认删除", f"确定删除要求「{g.requires[ri]}」？"):
+                return
+            g.requires.pop(ri)
+        self._edit_group_idx, self._edit_req_idx = None, -1
+        self._clear_inputs()
+        self.save_btn.config(text="保存组")
+        self._refresh_tree()
+        self._set_status("已删除")
+
+    # ── 导出工艺卡 / 工艺计算 ────────────────
+
+    def _on_export(self):
+        """导出完整工艺卡片 Excel。"""
+        filepath = filedialog.asksaveasfilename(
+            title="导出工艺卡片",
+            defaultextension=".xlsx",
+            filetypes=[("Excel 文件", "*.xlsx"), ("所有文件", "*.*")],
+        )
+        if not filepath:
+            return
+        try:
+            from process_card_exporter import export_process_card
+            result = export_process_card(filepath)
+            messagebox.showinfo("导出完成",
+                                f"工艺卡片已生成:\n{filepath}\n焦距: {result.focal_length:.2f}mm")
+            self._set_status(f"工艺卡已导出 — 焦距={result.focal_length:.2f}mm")
+        except PermissionError:
+            messagebox.showwarning("文件被占用",
+                                   "导出失败，文件正在被 Excel 或其他程序打开。\n请先关闭文件再重试。")
+        except Exception as e:
+            messagebox.showerror("导出失败", str(e))
+
+    def _on_process_calc(self):
+        """打开工艺计算窗口。"""
+        import subprocess, sys, os
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "process_planning.py")
+        try:
+            subprocess.Popen([sys.executable, script])
+            self._set_status("已打开工艺计算窗口")
+        except Exception as e:
+            messagebox.showerror("启动失败", f"无法启动工艺计算:\n{e}")
+
+
+# ──────────────────────────────────────────────
+# 启动入口
+# ──────────────────────────────────────────────
+
+def main():
+    root = tk.Tk()
+    TaskApp(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

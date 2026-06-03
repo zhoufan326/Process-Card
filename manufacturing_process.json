@@ -1,0 +1,160 @@
+[
+  {
+    "bay": "成形",
+    "process": "成形",
+    "obj": "",
+    "requires": [
+      "1.材料：${material}",
+      "2.领取平滚件，尺寸：Φ${blank_d}",
+      "3.铣磨R1=${R1}，控制中厚Tc=${tc_grind1}±0.02，铣磨R2=${R2}，控制中厚Tc=${tc_grind2}±0.02，控制等厚差≤0.02，S1面划横线",
+      "倒角：(0.3~0.6)×45°"
+    ]
+  },
+  {
+    "bay": "球面",
+    "process": "细磨",
+    "obj": "S1",
+    "requires": [
+      "侧面作箭头，指向S2",
+      "精磨S1面，磨砂量约${grind_s1}"
+    ]
+  },
+  {
+    "bay": "球面",
+    "process": "抛光",
+    "obj": "S1",
+    "requires": [
+      "CA：＞Φ${CA_S1}（加严）",
+      "N＜${N_S1} ${IRR_S1} ${RMS_S1}",
+      "控制曲率范围（${r1_lower}～${r1_upper}）",
+      "粗糙度：＜${roughness_s1}",
+      "S/D：${SD_S1}"
+    ]
+  },
+  {
+    "bay": "球面",
+    "process": "细磨",
+    "obj": "S2",
+    "requires": [
+      "细磨S2面，控制中心厚度${tc_grind2}+0.01"
+    ]
+  },
+  {
+    "bay": "球面",
+    "process": "抛光",
+    "obj": "S2",
+    "requires": [
+      "S/D：${SD_S2}",
+      "CA：＞Φ${CA_S2}（加严）",
+      "N＜${N_S2} ${IRR_S2} ${RMS_S2}",
+      "控制曲率范围（${r2_lower}～${r2_upper}）",
+      "粗糙度：＜${roughness_s2}",
+      "Tc=${tc_polish1}±0.03"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "过程清洗",
+    "obj": "",
+    "requires": [
+      "清洗后无印子"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "仪器检",
+    "obj": "",
+    "requires": [
+      "S1曲率范围（${r1_lower}～${r1_upper}）（数据一一对应）",
+      "S2曲率范围（${r2_lower}～${r2_upper}）（数据一一对应）",
+      "焦距：${focal}@589nm（抽检）",
+      "S1：${IRR_S1} ${RMS_S1}（CA＞Φ${CA_S1}，数据一一对应）",
+      "S2：${IRR_S2} ${RMS_S2}（CA＞Φ${CA_S2}，数据一一对应）"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "过程检",
+    "obj": "",
+    "requires": [
+      "S1：S/D：${SD_S1}（CA＞Φ${CA_S1})",
+      "S2：S/D：${SD_S2}（CA＞Φ${CA_S2})",
+      "粗糙度：＜${roughness_s1}",
+      "Tc=${tc_polish1}±0.03（数据一一对应）"
+    ]
+  },
+  {
+    "bay": "球面",
+    "process": "磨边",
+    "obj": "",
+    "requires": [
+      "外径：Φ${D}（-0.01/-0.03）",
+      "最宽边厚约6.4",
+      "S1：CA：＞Φ${CA_S1}",
+      "S2：CA：＞Φ${CA_S2}",
+      "偏心＜${tilt_s1}′",
+      "倒角：0.2-0.5*45°",
+      "崩边＜0.3"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "过程清洗",
+    "obj": "",
+    "requires": [
+      "清洗后无印子"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "仪器检",
+    "obj": "",
+    "requires": [
+      "产品：1.材料：${material}",
+      "2.领取平滚件，尺寸：Φ${blank_d}±0.05×${blank_t}±0.05",
+      "S1：${IRR_S1} ${RMS_S1}（数据一一对应）",
+      "S2：${IRR_S2} ${RMS_S2}（数据一一对应）",
+      "S1曲率范围（${r1_lower}～${r1_upper}）（数据一一对应）",
+      "S2曲率范围（${r2_lower}～${r2_upper}）（数据一一对应）",
+      "焦距${focal}@589nm(抽检)",
+      "偏心＜${tilt_s1}′（数据一一对应）"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "过程检",
+    "obj": "",
+    "requires": [
+      "S1：S/D：${SD_S1}（CA＞Φ${CA_S1})",
+      "S2：S/D：${SD_S2}（CA＞Φ${CA_S2})",
+      "外径：Φ${D}（-0.01/-0.03）（数据一一对应）",
+      "侧面箭头指向S2面",
+      "粗糙度：＜${roughness_s1}",
+      "倒角：0.2~0.5",
+      "崩边＜0.5"
+    ]
+  },
+  {
+    "bay": "镀膜",
+    "process": "镀膜",
+    "obj": "",
+    "requires": [
+      "${coating_spec}",
+      "S1：S/D：${SD_S1}（CA＞Φ${CA_S1})",
+      "S2：S/D：${SD_S2}（CA＞Φ${CA_S2})",
+      "崩边＜0.5"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "镀膜检",
+    "obj": "",
+    "requires": [
+      "${coating_spec}",
+      "S1：S/D：${SD_S1}（CA＞Φ${CA_S1})",
+      "S2：S/D：${SD_S2}（CA＞Φ${CA_S2})",
+      "崩边＜0.5",
+      "擦镜纸+电容纸包装，供内部使用"
+    ]
+  }
+]
