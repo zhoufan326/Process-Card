@@ -468,8 +468,8 @@ class TaskApp:
             from process_card_exporter import export_process_card
             result = export_process_card(filepath)
             messagebox.showinfo("导出完成",
-                                f"工艺卡片已生成:\n{filepath}\n焦距: {result.focal_length:.2f}mm")
-            self._set_status(f"工艺卡已导出 — 焦距={result.focal_length:.2f}mm")
+                                f"工艺卡片已生成:\n{filepath}")
+            self._set_status(f"工艺卡已导出")
         except PermissionError:
             messagebox.showwarning("文件被占用",
                                    "导出失败，文件正在被 Excel 或其他程序打开。\n请先关闭文件再重试。")
