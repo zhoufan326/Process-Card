@@ -236,7 +236,7 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
             _cell(ws, f"B{row}", bay if i == 0 else "", font=_F["bold11"], fill=fill)
             _cell(ws, f"C{row}", proc if i == 0 else "", font=_F["bold11"], fill=fill)
             _cell(ws, f"D{row}", obj if i == 0 else "", font=_F["bold11"], fill=fill)
-            _cell(ws, f"E{row}", req, font=_F["p"], align=_ALIGN_L)
+            _cell(ws, f"E{row}", req, font=_F["p"], align=_ALIGN_C)
             for c in range(6, 14): _cell(ws, f"{_cl(c)}{row}", "", font=_F["bold11"])
             ws.row_dimensions[row].height = max(20, 14 * max(1, len(req) // 40))
             row += 1
@@ -245,7 +245,8 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
             for c in (1, 2, 3, 4): ws.merge_cells(start_row=gs, start_column=c, end_row=ge, end_column=c)
     last_row = row - 1
     ws.merge_cells(start_row=13, start_column=13, end_row=last_row, end_column=15)
-
+    for mr in range(13, last_row + 1): ws.merge_cells(start_row=mr, start_column=5, end_row=mr, end_column=7)
+          #这里的5和7是列号，循环中代表E和G
     # ── 变更记录页脚 ──
     ft = last_row + 3
     _cell(ws, f"A{ft}", "变更记录", font=_F["sec"])

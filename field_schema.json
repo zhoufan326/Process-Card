@@ -9,7 +9,7 @@
           "attr": "material",
           "label": "透镜材料",
           "type": "str",
-          "default": "Corning 7980 KrF",
+          "default": "Corning 7980 ArF 0F",
           "_comment": "材料牌号"
         },
         {
@@ -17,7 +17,7 @@
           "label": "R1 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 284.241,
+          "default": -439.797,
           "_comment": "第1面曲率半径"
         },
         {
@@ -25,7 +25,7 @@
           "label": "R2 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 24.944,
+          "default": 129.083,
           "_comment": "第2面曲率半径"
         },
         {
@@ -33,7 +33,7 @@
           "label": "外径 D",
           "unit": "mm",
           "type": "float",
-          "default": 15.0,
+          "default": 48.0,
           "_comment": "透镜成品外径"
         },
         {
@@ -41,7 +41,7 @@
           "label": "中心厚度 Tc",
           "unit": "mm",
           "type": "float",
-          "default": 2.42,
+          "default": 14.89,
           "_comment": "透镜中心厚度"
         },
         {
@@ -70,7 +70,7 @@
           "label": "Tc 公差",
           "unit": "mm",
           "type": "float",
-          "default": 0.02,
+          "default": 0.03,
           "_comment": "中心厚度加工公差"
         },
         {
@@ -80,6 +80,14 @@
           "type": "float",
           "default": 2.0,
           "_comment": "磨边前预留口径余量"
+        },
+        {
+          "attr": "blank_d_tol",
+          "label": "下料口径公差",
+          "unit": "mm",
+          "type": "float",
+          "default": 0.02,
+          "_comment": "毛坯下料外径正公差"
         },
         {
           "attr": "blank_t_tol",
@@ -96,36 +104,36 @@
       "_comment": "各工序的材料去除量",
       "fields": [
         {
-          "attr": "grind_s1",
+          "attr": "mill_s1",
           "label": "S1面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 0.15,
+          "default": 0.78,
           "_comment": "S1面铣磨材料去除量"
         },
         {
-          "attr": "grind_s2",
+          "attr": "mill_s2",
           "label": "S2面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 1.8,
+          "default": 0.2,
           "_comment": "S2面铣磨材料去除量"
         },
         {
-          "attr": "polish_s1",
-          "label": "S1细磨抛光量",
+          "attr": "grinding_polishing_s1",
+          "label": "S1精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.16,
-          "_comment": "S1面细磨+抛光去除量"
+          "default": 0.2,
+          "_comment": "S1面精磨+抛光总去除量"
         },
         {
-          "attr": "polish_s2",
-          "label": "S2细磨抛光量",
+          "attr": "grinding_polishing_s2",
+          "label": "S2精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.16,
-          "_comment": "S2面细磨+抛光去除量"
+          "default": 0.2,
+          "_comment": "S2面精磨+抛光总去除量"
         }
       ]
     },
@@ -137,7 +145,7 @@
           "attr": "s1_n",
           "label": "S1 光圈数 N",
           "type": "float",
-          "default": 1.0,
+          "default": 2.0,
           "_comment": "S1面牛顿环光圈数"
         },
         {
@@ -145,14 +153,14 @@
           "label": "S1 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.1,
+          "default": 0.15,
           "_comment": "S1面局部光圈不规则度"
         },
         {
           "attr": "s2_n",
           "label": "S2 光圈数 N",
           "type": "float",
-          "default": 1.0,
+          "default": 2.0,
           "_comment": "S2面牛顿环光圈数"
         },
         {
@@ -160,7 +168,7 @@
           "label": "S2 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.1,
+          "default": 0.15,
           "_comment": "S2面局部光圈不规则度"
         },
         {
@@ -168,7 +176,7 @@
           "label": "S1 RMS",
           "unit": "nm",
           "type": "float",
-          "default": 4.0,
+          "default": 0.0,
           "_comment": "S1面RMS粗糙度"
         },
         {
@@ -176,7 +184,7 @@
           "label": "S2 RMS",
           "unit": "nm",
           "type": "float",
-          "default": 4.0,
+          "default": 0.0,
           "_comment": "S2面RMS粗糙度"
         },
         {
@@ -212,14 +220,14 @@
           "attr": "drawing_no",
           "label": "图号",
           "type": "str",
-          "default": "M0454-G10",
+          "default": "M0294-G03",
           "_comment": "设计图号"
         },
         {
           "attr": "card_no",
           "label": "工艺卡号",
           "type": "str",
-          "default": "NQ0871",
+          "default": "NQ0528",
           "_comment": "工艺卡片编号"
         },
         {
@@ -253,14 +261,14 @@
           "attr": "s1_sd",
           "label": "S1 S/D",
           "type": "str",
-          "default": "10/5",
+          "default": "20/10",
           "_comment": "S1面光洁度等级"
         },
         {
           "attr": "s2_sd",
           "label": "S2 S/D",
           "type": "str",
-          "default": "10/5",
+          "default": "20/10",
           "_comment": "S2面光洁度等级"
         },
         {
@@ -268,7 +276,7 @@
           "label": "S1 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 15.0,
+          "default": 44.0,
           "_comment": "S1面有效检测口径"
         },
         {
@@ -276,7 +284,7 @@
           "label": "S2 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 14.0,
+          "default": 44.0,
           "_comment": "S2面有效检测口径"
         },
         {
@@ -300,28 +308,6 @@
           "type": "str",
           "default": "S1、S2：AR-193.368nm，R＜0.5%@193.368nm，AOI=0°±35°",
           "_comment": "镀膜规格要求"
-        },
-        {
-          "attr": "trays_s1",
-          "label": "S1 每盘数量",
-          "type": "int",
-          "default": 1,
-          "_comment": "S1面每盘透镜数量"
-        },
-        {
-          "attr": "trays_s2",
-          "label": "S2 每盘数量",
-          "type": "int",
-          "default": 1,
-          "_comment": "S2面每盘透镜数量"
-        },
-        {
-          "attr": "tray_diameter",
-          "label": "盘径 Dj",
-          "unit": "mm",
-          "type": "float",
-          "default": 67.0,
-          "_comment": "加工盘直径"
         }
       ]
     }
@@ -467,30 +453,45 @@
       "fmt": ".0f"
     },
     {
+      "_comment": "加严 CA（按毛坯比例放大）"
+    },
+    {
+      "ctx": "${CA_S1_strict}",
+      "source": "result",
+      "attr": "s1_ca_strict",
+      "fmt": ".1f"
+    },
+    {
+      "ctx": "${CA_S2_strict}",
+      "source": "result",
+      "attr": "s2_ca_strict",
+      "fmt": ".1f"
+    },
+    {
       "_comment": "加工去除量"
     },
     {
-      "ctx": "${grind_s1}",
+      "ctx": "${mill_s1}",
       "source": "params",
-      "attr": "grind_s1",
+      "attr": "mill_s1",
       "fmt": ".2f"
     },
     {
-      "ctx": "${grind_s2}",
+      "ctx": "${mill_s2}",
       "source": "params",
-      "attr": "grind_s2",
+      "attr": "mill_s2",
       "fmt": ".2f"
     },
     {
-      "ctx": "${polish_s1}",
+      "ctx": "${grinding_polishing_s1}",
       "source": "params",
-      "attr": "polish_s1",
+      "attr": "grinding_polishing_s1",
       "fmt": ".2f"
     },
     {
-      "ctx": "${polish_s2}",
+      "ctx": "${grinding_polishing_s2}",
       "source": "params",
-      "attr": "polish_s2",
+      "attr": "grinding_polishing_s2",
       "fmt": ".2f"
     },
     {
@@ -524,28 +525,55 @@
       "_comment": "各工序后的中心厚度"
     },
     {
-      "ctx": "${tc_grind1}",
+      "ctx": "${tc_mill1}",
       "source": "result",
-      "attr": "tc_after_grind_s1",
+      "attr": "tc_after_mill_s1",
       "fmt": ".3f"
     },
     {
-      "ctx": "${tc_grind2}",
+      "ctx": "${tc_mill2}",
       "source": "result",
-      "attr": "tc_after_grind_s2",
+      "attr": "tc_after_mill_s2",
       "fmt": ".3f"
     },
     {
       "ctx": "${tc_polish1}",
       "source": "result",
-      "attr": "tc_after_polish_s1",
+      "attr": "tc_after_grinding_s1",
       "fmt": ".3f"
     },
     {
       "ctx": "${tc_polish2}",
       "source": "result",
-      "attr": "tc_after_polish_s2",
+      "attr": "tc_after_grinding_s2",
       "fmt": ".3f"
+    },
+    {
+      "_comment": "精磨量 / 抛光量（由精磨抛光总量拆分）"
+    },
+    {
+      "ctx": "${grinding_s1}",
+      "source": "result",
+      "attr": "grinding_s1",
+      "fmt": ".2f"
+    },
+    {
+      "ctx": "${grinding_s2}",
+      "source": "result",
+      "attr": "grinding_s2",
+      "fmt": ".2f"
+    },
+    {
+      "ctx": "${polishing_s1}",
+      "source": "result",
+      "attr": "polishing_s1",
+      "fmt": ".2f"
+    },
+    {
+      "ctx": "${polishing_s2}",
+      "source": "result",
+      "attr": "polishing_s2",
+      "fmt": ".2f"
     },
     {
       "_comment": "曲率半径公差范围"
@@ -609,6 +637,48 @@
       "source": "result",
       "attr": "sag_s2",
       "fmt": ".4f"
+    },
+    {
+      "_comment": "倒角规格"
+    },
+    {
+      "ctx": "${chamfer}",
+      "source": "params",
+      "attr": "chamfer",
+      "fmt": "s"
+    },
+    {
+      "_comment": "崩边允许值"
+    },
+    {
+      "ctx": "${edge_chip}",
+      "source": "params",
+      "attr": "edge_chip",
+      "fmt": ".1f"
+    },
+    {
+      "_comment": "Tc 公差"
+    },
+    {
+      "ctx": "${tc_tol}",
+      "source": "params",
+      "attr": "tc_tol",
+      "fmt": ".2f"
+    },
+    {
+      "_comment": "下料公差"
+    },
+    {
+      "ctx": "${blank_d_tol}",
+      "source": "params",
+      "attr": "blank_d_tol",
+      "fmt": ".2f"
+    },
+    {
+      "ctx": "${blank_t_tol}",
+      "source": "params",
+      "attr": "blank_t_tol",
+      "fmt": ".2f"
     }
   ],
   "validate_rules": [

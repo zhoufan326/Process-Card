@@ -19,19 +19,8 @@ from typing import Callable, Optional
 class TreeDragController:
     """控制 ttk.Treeview 的拖拽与选择交互。
 
-    负责事件绑定、拖拽状态管理和视觉反馈（高亮）。
-    业务逻辑通过回调函数委托给外部。
-
-    ---
-    iid 约定（重要）
-    本组件依赖业务方通过 is_draggable 回调来判定哪些树节点可拖拽。
-    业务方需确保可拖拽的节点 iid 符合以下格式，以便 _get_group_index
-    能从 iid 中解析出索引：
-
-        可拖拽节点:  iid = f"g{索引}"      如 "g0", "g12"
-        不可拖拽节点: iid = f"g{gi}_r{ri}"  如 "g0_r0", "g2_r3"
-
-    如果业务方使用不同的 iid 命名规则，需覆盖 is_draggable 回调。
+    支持组级拖拽(gX)和组内 req 拖拽(gX_rY)。
+    通过回调 on_move_group / on_move_req 委托业务逻辑。
     """
 
     def __init__(
@@ -40,7 +29,8 @@ class TreeDragController:
         *,
         is_draggable: Callable[[str], bool],
         on_select: Optional[Callable[[str], None]] = None,
-        on_move: Optional[Callable[[int, int], None]] = None,
+        on_move_group: Optional[Callable[[int, int], None]] = None,
+        on_move_req: Optional[Callable[[int, int, int], None]] = None,
         set_status: Optional[Callable[[str], None]] = None,
     ):
         """
@@ -48,17 +38,19 @@ class TreeDragController:
             tree: ttk.Treeview 实例
             is_draggable: 接收 item_id，返回 True 表示该行可拖拽
             on_select: 单击/选中回调, 接收 item_id
-            on_move: 拖拽交换回调, 接收 (src_index, tgt_index)
+            on_move_group: 组交换回调, 接收 (src_index, tgt_index)
+            on_move_req: 组内要求重排回调, 接收 (group_idx, src_req_idx, tgt_req_idx)
             set_status: 状态栏更新回调, 接收字符串
         """
         self._tree = tree
         self._is_draggable = is_draggable
         self._on_select = on_select
-        self._on_move = on_move
+        self._on_move_group = on_move_group
+        self._on_move_req = on_move_req
         self._set_status = set_status
 
-        self._drag_source_idx: Optional[int] = None
-        self._drag_target_idx: Optional[int] = None
+        self._drag_src_item: Optional[str] = None
+        self._drag_tgt_item: Optional[str] = None
         self._drag_did_move: bool = False
 
         self._bind_events()
@@ -70,81 +62,106 @@ class TreeDragController:
         self._tree.bind("<B1-Motion>", self._on_drag_motion)
         self._tree.bind("<ButtonRelease-1>", self._on_release)
 
-    # ── 工具方法 ──────────────────────────────
+    # ── 解析 iid ──────────────────────────────
 
     @staticmethod
-    def _get_group_index(item: str) -> Optional[int]:
-        """从可拖拽节点的 iid 中解析出组索引。
-
-        要求 iid 格式为 'g<数字>'，例如 'g0' -> 0, 'g12' -> 12。
-        此方法应与 is_draggable 回调配合使用——只有通过 is_draggable
-        校验的节点才会进入此解析逻辑。
+    def _parse(item: str):
+        """返回 (group_index, req_index_or_None)。
+        如 "g3" -> (3, None); "g2_r5" -> (2, 5)。
         """
-        if item and item.startswith("g"):
+        if not item or not item.startswith("g"):
+            return None, None
+        parts = item.split("_")
+        try:
+            gi = int(parts[0][1:])
+        except ValueError:
+            return None, None
+        ri = None
+        if len(parts) == 2 and parts[1].startswith("r"):
             try:
-                return int(item[1:])
+                ri = int(parts[1][1:])
             except ValueError:
-                return None
-        return None
+                pass
+        return gi, ri
+
+    def _can_drag(self, item: str) -> bool:
+        if not item:
+            return False
+        if not self._is_draggable(item):
+            return False
+        gi, ri = self._parse(item)
+        if gi is None:
+            return False
+        if ri is not None and self._get_group_size(gi) < 2:
+            return False
+        return True
+
+    def _get_group_size(self, gi: int) -> int:
+        children = self._tree.get_children(f"g{gi}")
+        return len(children)
 
     # ── 事件处理 ──────────────────────────────
 
     def _on_press(self, event):
-        """鼠标按下：记录源组索引。"""
         item = self._tree.identify_row(event.y)
-        if not item or not self._is_draggable(item):
-            self._drag_source_idx = None
+        if not self._can_drag(item):
+            self._drag_src_item = None
             self._drag_did_move = False
             return
-        idx = self._get_group_index(item)
-        if idx is not None:
-            self._drag_source_idx = idx
-            self._drag_target_idx = None
-            self._drag_did_move = False
+        self._drag_src_item = item
+        self._drag_tgt_item = None
+        self._drag_did_move = False
 
     def _on_drag_motion(self, event):
-        """拖拽移动：高亮目标组行。"""
-        if self._drag_source_idx is None:
+        if self._drag_src_item is None:
             return
         item = self._tree.identify_row(event.y)
-        if not item or not self._is_draggable(item):
+        if not self._can_drag(item) or item == self._drag_src_item:
             return
-        target_idx = self._get_group_index(item)
-        if target_idx is None or target_idx == self._drag_source_idx:
-            return
-        if target_idx == self._drag_target_idx:
+        if item == self._drag_tgt_item:
             return
 
         self._drag_did_move = True
-        self._drag_target_idx = target_idx
+        self._drag_tgt_item = item
         self._tree.selection_set(item)
+
+        s_gi, s_ri = self._parse(self._drag_src_item)
+        t_gi, t_ri = self._parse(item)
+        if s_ri is None and t_ri is None:
+            msg = f"拖拽组 [{s_gi + 1}] → 目标 [{t_gi + 1}]"
+        elif s_ri is not None and t_ri is not None and s_gi == t_gi:
+            msg = f"拖拽要求 [{s_gi + 1}.{s_ri + 1}] → 目标 [{t_gi + 1}.{t_ri + 1}]"
+        else:
+            if self._set_status:
+                self._set_status(f"不允许跨类型拖拽")
+            self._drag_did_move = False
+            return
         if self._set_status:
-            self._set_status(
-                f"拖拽组 [{self._drag_source_idx + 1}] → 目标 [{target_idx + 1}]"
-            )
+            self._set_status(msg)
 
     def _on_release(self, event):
-        """鼠标释放：拖拽则执行交换，否则触发选择。"""
-        if not self._drag_did_move or self._drag_source_idx is None or self._drag_target_idx is None:
-            self._clear_drag_state()
+        if not self._drag_did_move or self._drag_src_item is None or self._drag_tgt_item is None:
+            self._clear()
             item = self._tree.identify_row(event.y)
             if item and self._on_select:
                 self._on_select(item)
             return
 
-        src = self._drag_source_idx
-        tgt = self._drag_target_idx
+        s_gi, s_ri = self._parse(self._drag_src_item)
+        t_gi, t_ri = self._parse(self._drag_tgt_item)
 
-        if self._on_move:
-            self._on_move(src, tgt)
+        if s_ri is None and t_ri is None:
+            if self._on_move_group:
+                self._on_move_group(s_gi, t_gi)
+            self._tree.selection_set(f"g{t_gi}")
+        elif s_ri is not None and t_ri is not None and s_gi == t_gi:
+            if self._on_move_req:
+                self._on_move_req(s_gi, s_ri, t_ri)
+            self._tree.selection_set(self._drag_tgt_item)
 
-        moved_iid = f"g{tgt}"
-        self._tree.selection_set(moved_iid)
-        self._tree.focus(moved_iid)
+        self._clear()
 
-        self._clear_drag_state()
-
-    def _clear_drag_state(self):
-        self._drag_source_idx = None
-        self._drag_target_idx = None
+    def _clear(self):
+        self._drag_src_item = None
+        self._drag_tgt_item = None
         self._drag_did_move = False

@@ -36,11 +36,9 @@ SCHEMA = _load_schema()
 # ═══ 光学/工艺经验常数 ═══
 # 以下常数来源于《工艺方案设计-王千奥.xlsx》中的工程经验值
 _SAMPLE_PRECISION_THRESHOLD = 35.0   # R值分界点 (mm), <此值用μm, ≥用%
-_PRECISION_CONTACT_RATIO = 0.32      # 检测接触外径比例
 _TILT_CONST = 0.291                  # 偏心→面倾斜换算系数 (源于工艺经验)
 _SPHERE_CENTER_CONST = 3438          # 角分→弧度换算 (弧分到弧度的简化: 3438 ≈ 180*60/π)
-_FRINGE_CONST = 4.0                  # 矢高差: λ/N 单位换算分母 (反射式牛顿环)
-_DR_OLD_NUMERATOR = 0.0006328        # ΔR旧公式分子常数 (632.8nm波长校准值)
+_FRINGE_CONST = 2.0                  # 反射式牛顿环：OPD=2×Δs → 每道光圈 Δs=λ/2
 
 
 # ═══ 数据结构 ═══
@@ -78,11 +76,19 @@ class CalcResult:
 
     blank_diameter: float = 0.0
     blank_thickness: float = 0.0
+    s1_ca_strict: float = 0.0
+    s2_ca_strict: float = 0.0
 
-    tc_after_grind_s1: float = 0.0
-    tc_after_grind_s2: float = 0.0
-    tc_after_polish_s1: float = 0.0
-    tc_after_polish_s2: float = 0.0
+    tc_after_mill_s1: float = 0.0
+    tc_after_mill_s2: float = 0.0
+    tc_after_grinding_s1: float = 0.0
+    tc_after_grinding_s2: float = 0.0
+
+    # 精磨 / 抛光（由总量 grinding_polishing 拆分得出）
+    grinding_s1: float = 0.0
+    grinding_s2: float = 0.0
+    polishing_s1: float = 0.0
+    polishing_s2: float = 0.0
 
     sag_s1: float = 0.0
     sag_s2: float = 0.0
@@ -97,12 +103,10 @@ class CalcResult:
     r2_sample_precision: float = 0.0
     r1_dr_with_sample: float = 0.0
     r1_dr_no_sample: float = 0.0
-    r1_dr_old: float = 0.0
     r1_upper: float = 0.0
     r1_lower: float = 0.0
     r2_dr_with_sample: float = 0.0
     r2_dr_no_sample: float = 0.0
-    r2_dr_old: float = 0.0
     r2_upper: float = 0.0
     r2_lower: float = 0.0
     r1_actual_upper: str = ""
@@ -175,16 +179,28 @@ def calculate(p: LensParams) -> CalcResult:
 
     # ── 下料尺寸 ──
     r.blank_diameter = round(p.diameter + p.pre_edge, 1)
-    # 下料中心厚度 = Tc + 铣磨S1 + 铣磨S2 + 细抛S1 + 细抛S2 + 下料厚度公差 + Tc公差
-    raw_thick = (p.tc + p.grind_s1 + p.grind_s2
-                 + p.polish_s1 + p.polish_s2 + p.blank_t_tol + p.tc_tol)
+    # 下料中心厚度 = Tc + 铣磨S1 + 铣磨S2 + 精磨抛光S1 + 精磨抛光S2
+    raw_thick = p.tc + p.mill_s1 + p.mill_s2 + p.grinding_polishing_s1 + p.grinding_polishing_s2
     r.blank_thickness = round(raw_thick, 2)
 
+    # ── 加严 CA（检测口径按毛坯比例放大）──
+    # 加严 CA = 原 CA × 毛坯外径 / 成品外径
+    # 例如：CA=44, blank_D=50, D=48 → 加严 CA=45.8
+    r.s1_ca_strict = round(p.s1_ca * r.blank_diameter / p.diameter, 1)
+    r.s2_ca_strict = round(p.s2_ca * r.blank_diameter / p.diameter, 1)
+
+    # ── 精磨量 / 抛光量拆分 ──
+    # polishing 固定为 0.02mm，grinding = grinding_polishing - polishing
+    r.polishing_s1 = 0.02
+    r.polishing_s2 = 0.02
+    r.grinding_s1  = round(p.grinding_polishing_s1 - r.polishing_s1, 2)
+    r.grinding_s2  = round(p.grinding_polishing_s2 - r.polishing_s2, 2)
+
     # ── 工序厚度 (逐层扣除) ──
-    r.tc_after_grind_s1  = round(raw_thick - p.grind_s1, 2)              # 铣磨S1后
-    r.tc_after_grind_s2  = round(r.tc_after_grind_s1 - p.grind_s2, 2)    # 铣磨S2后
-    r.tc_after_polish_s1 = round(r.tc_after_grind_s2 - p.polish_s1, 2)   # 细抛S1后 = 最终Tc
-    r.tc_after_polish_s2 = round(r.tc_after_polish_s1 - p.polish_s2, 2)  # 细抛S2后(校验)
+    r.tc_after_mill_s1         = round(raw_thick - p.mill_s1, 2)                          # 铣磨S1后
+    r.tc_after_mill_s2         = round(r.tc_after_mill_s1 - p.mill_s2, 2)                 # 铣磨S2后
+    r.tc_after_grinding_s1     = round(r.tc_after_mill_s2 - p.grinding_polishing_s1, 2)   # 抛光S1后（S2待抛）
+    r.tc_after_grinding_s2     = round(r.tc_after_grinding_s1 - p.grinding_polishing_s2, 2)  # 抛光S2后 = 原始Tc（校验）
 
     # ── 矢高 ──
     # 自动限制 CA ≤ 外径 (避免物理上不存在的区域计算崩溃)
@@ -193,7 +209,7 @@ def calculate(p: LensParams) -> CalcResult:
     r.sag_s1 = round(_sag(p.r1, ca1), 6)
     r.sag_s2 = round(_sag(p.r2, ca2), 6)
 
-    # 矢高差 = N * λ/4 (反射式牛顿环, 单位mm)
+    # 矢高差 = N × λ/2 (反射式牛顿环: OPD=2×Δs → 每道光圈 Δs=λ/2, 单位mm)
     sag_per_fringe = p.wavelength * 1e-6 / _FRINGE_CONST
     r.sag_diff_s1 = round(p.s1_n * sag_per_fringe, 6)
     r.sag_diff_s2 = round(p.s2_n * sag_per_fringe, 6)
@@ -218,19 +234,12 @@ def calculate(p: LensParams) -> CalcResult:
     r.r1_dr_no_sample = round(abs(abs(r.r_max_s1) - abs(p.r1)), 4)
     r.r2_dr_no_sample = round(abs(abs(r.r_max_s2) - abs(p.r2)), 4)
 
-    # ΔR 旧公式 (保留用于对比，基于632.8nm校准常数)
-    cr = _PRECISION_CONTACT_RATIO
-    r.r1_dr_old = round(_safe_div(_DR_OLD_NUMERATOR * p.s1_n,
-                                   (ca1 * cr / (2 * p.r1)) ** 2) + precision_r1, 4)
-    r.r2_dr_old = round(_safe_div(_DR_OLD_NUMERATOR * p.s2_n,
-                                   (ca2 * cr / (2 * p.r2)) ** 2) + precision_r2, 4)
-
     # R值上/下限
-    # 注意: 当前对称处理ΔR为一个简化，实际工艺中允许的上下偏差可能不对称
-    r.r1_upper = round(p.r1 + r.r1_dr_with_sample, 4)
-    r.r1_lower = round(p.r1 - r.r1_dr_with_sample, 4)
-    r.r2_upper = round(p.r2 + r.r2_dr_with_sample, 4)
-    r.r2_lower = round(p.r2 - r.r2_dr_with_sample, 4)
+    # 注意: 使用不含样板公差的 ΔR（样板精度 ε 是检测工具误差，非零件本身偏差）
+    r.r1_upper = round(p.r1 + r.r1_dr_no_sample, 4)
+    r.r1_lower = round(p.r1 - r.r1_dr_no_sample, 4)
+    r.r2_upper = round(p.r2 + r.r2_dr_no_sample, 4)
+    r.r2_lower = round(p.r2 - r.r2_dr_no_sample, 4)
 
     # 实际上下限文字
     for side in ('r1', 'r2'):
@@ -338,84 +347,163 @@ class ProcessPlanApp:
                   relief="flat", cursor="hand2", bd=0,
                   activebackground=CLR_ACCENT_HI, activeforeground="white",
                   width=12).pack(side="left", padx=14, pady=4)
-        tk.Button(bf, text="保存默认值", command=self._on_save_defaults,
-                  font=(FONT, 10), bg="#A1887F", fg="white",
+        tk.Button(bf, text="应用", command=self._on_apply,
+                  font=(FONT, 10), bg=CLR_ACCENT, fg="white",
                   relief="flat", cursor="hand2", bd=0,
-                  activebackground="#795548", activeforeground="white",
+                  activebackground=CLR_ACCENT_HI, activeforeground="white",
                   width=12).pack(side="left", padx=4, pady=4)
         self._status = tk.StringVar(value="就绪 — 请输入参数后点击「开始计算」")
         tk.Label(bf, textvariable=self._status, font=(FONT, 9),
                  fg=CLR_SUBTEXT, bg=CLR_HEADER, anchor="e").pack(side="right", padx=14, pady=4)
 
-    # ── 输入字段 — 由 field_schema.json 驱动 ──
+    # ═══════════════════════════════════════════════
+    #  Schema-Driven 输入面板构建
+    #  核心思想：字段定义在 field_schema.json 中，Python 代码只负责渲染
+    #  优点：新增字段只需改 JSON，不改代码；UI 和逻辑解耦
+    # ═══════════════════════════════════════════════
 
     def _build_input_fields(self, panel):
+        """由 field_schema.json 驱动，自动生成全部输入控件。
+
+        步骤拆解：
+          1. 读取 LensParams 默认值（由 schema 动态构建的 dataclass）
+          2. 遍历 SCHEMA["gui_sections"]，对每个 section 画标题 + 渲染字段
+          3. 每个字段渲染为 [Label | Entry( + Unit)] 一行
+        """
         self._entries = {}
         _DEFAULTS = LensParams()
-        r = [0]
 
+        # ── 关于 _row = [0] ──
+        # 为什么用列表而不是普通 int？
+        # 因为 Python 闭包（nested function）只能「读」外层不可变变量，
+        # 不能直接「修改」外层 int。列表是可变对象，_row[0] += 1 修改的是
+        # 列表内容而非变量绑定，闭包可以捕获并修改。
+        # 等效替代：用 nonlocal row；或直接用实例属性 self._row。
+        _row = [0]
+
+        # ── 1. 渲染 Section 标题 ──
+        # 利用闭包捕获 panel、_row，减少重复传参
         def _section(title):
             tk.Label(panel, text=title, font=(FONT, 10, "bold"),
                      fg=CLR_ACCENT, bg=CLR_PANEL, anchor="w").grid(
-                         row=r[0], column=0, columnspan=2, sticky="ew", padx=14, pady=(10, 2))
-            r[0] += 1
+                         row=_row[0], column=0, columnspan=2,
+                         sticky="ew", padx=14, pady=(10, 2))
+            _row[0] += 1
 
+        # ── 2. 渲染单个字段行 ──
+        # 布局：左侧标签(右对齐) | 右侧[输入框 + 可选单位标签]
         def _add_field(attr, label, unit=""):
             default = str(getattr(_DEFAULTS, attr))
+
+            # 2a. 标签列（列0） — 右对齐，固定宽度 18 字符
             tk.Label(panel, text=label, font=(FONT, 9), fg=CLR_SUBTEXT,
                      bg=CLR_PANEL, anchor="e", width=18).grid(
-                         row=r[0], column=0, padx=(14, 4), pady=2, sticky="e")
+                         row=_row[0], column=0, padx=(14, 4), pady=2, sticky="e")
+
+            # 2b. 输入列（列1） — Entry + 可选单位
             frm = tk.Frame(panel, bg=CLR_PANEL)
-            frm.grid(row=r[0], column=1, sticky="ew", padx=(0, 14), pady=2)
+            frm.grid(row=_row[0], column=1, sticky="ew", padx=(0, 14), pady=2)
+
             ent = tk.Entry(frm, font=(FONT, 9), width=18, bg="white",
                            fg=CLR_TEXT, relief="solid", bd=1)
             ent.pack(side="left")
             ent.insert(0, default)
+
             if unit:
                 tk.Label(frm, text=unit, font=(FONT, 8), fg=CLR_SUBTEXT,
                          bg=CLR_PANEL).pack(side="left", padx=(4, 0))
-            self._entries[attr] = ent
-            r[0] += 1
 
+            self._entries[attr] = ent
+            _row[0] += 1
+
+        # ── 3. Schema 驱动循环 ──
+        # 遍历 SCHEMA["gui_sections"]，对每个 section：
+        #   先画 section 标题，再渲染该 section 下的所有字段
+        # 注意：schema 中可以包含 _comment 标记条目（不含 attr），需跳过
         for section in SCHEMA["gui_sections"]:
             _section(section["title"])
             for f in section["fields"]:
-                if "attr" not in f:   # 跳过 _comment 条目
+                if "attr" not in f:
                     continue
                 _add_field(f["attr"], f["label"], f.get("unit", ""))
 
-    # ── 保存默认值到 field_schema.json ──
+    # ═══════════════════════════════════════════════
+    #  应用按钮 → Read-Modify-Write 模式
+    #  将当前 GUI 输入值写回 field_schema.json 的 default 字段
+    #  使得下次启动或主窗口同步时使用最新值
+    # ═══════════════════════════════════════════════
 
-    def _on_save_defaults(self):
-        """将当前所有输入值写入 field_schema.json 的 default 字段。"""
-        schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "field_schema.json")
+    def _on_apply(self):
+        """将当前所有输入值持久化到 field_schema.json 的 default 字段。
+
+        流程（经典 Read-Modify-Write 模式）：
+          Step 1 — Read:   读取 field_schema.json → schema 字典
+          Step 2 — Modify: 遍历 gui_sections，用 Entry 内容覆盖 default
+          Step 3 — Write:  将修改后的 schema 写回 JSON 文件
+
+        类型处理：
+          schema 中每个字段有 "type" 标记（float / int / str），
+          写入时做类型转换，确保 JSON 输出正确的数据类型（而非全部存成字符串）。
+        """
+        schema_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "field_schema.json")
+
+        # ── Step 1: Read ──
+        # 注意：每次都重新从磁盘读取，而非使用模块级的 SCHEMA 常量
+        # 原因：_on_calculate 可能已修改 SCHEMA，重新读取确保拿到最新磁盘内容
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
                 schema = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            messagebox.showerror("错误", "无法读取 field_schema.json")
+        except (OSError, json.JSONDecodeError) as e:
+            messagebox.showerror("错误", f"无法读取 field_schema.json\n路径: {schema_path}\n原因: {e}")
             return
 
-        # 更新 default 值
+        # ── Step 2: Modify ──
+        # 类型感知的 default 值更新：
+        #   str   → 直接存（如材料名 "Corning 7980"）
+        #   float → float(raw)，空字符串回退 0.0
+        #   int   → int(raw)，空字符串回退 0
         for section in schema.get("gui_sections", []):
             for f in section.get("fields", []):
-                if "attr" in f and f["attr"] in self._entries:
-                    raw = self._entries[f["attr"]].get().strip()
-                    if f["type"] == "float":
-                        f["default"] = float(raw) if raw else 0.0
-                    elif f["type"] == "int":
-                        f["default"] = int(raw) if raw else 0
-                    else:
-                        f["default"] = raw
+                if "attr" not in f or f["attr"] not in self._entries:
+                    continue
+                raw = self._entries[f["attr"]].get().strip()
+                if f["type"] == "float":
+                    f["default"] = float(raw) if raw else 0.0
+                elif f["type"] == "int":
+                    f["default"] = int(raw) if raw else 0
+                else:
+                    f["default"] = raw
 
-        try:
-            with open(schema_path, "w", encoding="utf-8") as f:
-                json.dump(schema, f, ensure_ascii=False, indent=2)
-            messagebox.showinfo("保存完成", "当前参数已保存为 field_schema.json 的默认值。")
-            self._status.set("默认值已保存")
-        except OSError:
-            messagebox.showerror("错误", "无法写入 field_schema.json，文件可能被占用。")
+        # ── Step 3: Write（带重试） ──
+        # VS Code 打开 field_schema.json 时会持有写锁，导致写入失败。
+        # 最多重试 3 次，每次间隔 0.5s，等待锁释放。
+        import time
+        success = False
+        for attempt in range(3):
+            try:
+                with open(schema_path, "w", encoding="utf-8") as f:
+                    json.dump(schema, f, ensure_ascii=False, indent=2)
+                success = True
+                break
+            except OSError:
+                if attempt < 2:
+                    time.sleep(0.5)
+                continue
+        if success:
+            messagebox.showinfo(
+                "应用完成",
+                "当前参数已更新到 field_schema.json。\n返回主窗口后参数将同步显示。")
+            self._status.set("参数已应用")
+        else:
+            messagebox.showerror(
+                "写入失败",
+                "无法写入 field_schema.json，文件可能被占用。\n\n"
+                "建议:\n"
+                "1. 关闭 VS Code 中 field_schema.json 的标签页\n"
+                "2. 关闭其他可能打开该文件的程序\n"
+                "3. 稍后重试")
 
     # ── 校验 & 计算 ──
 
@@ -499,10 +587,18 @@ class ProcessPlanApp:
         _h("下料 / 毛坯尺寸")
         _l("毛坯口径", f"{r.blank_diameter:.2f}", "mm")
         _l("下料中心厚度", f"{r.blank_thickness:.3f}", "mm")
-        _l("铣磨S1后 Tc", f"{r.tc_after_grind_s1:.3f}", "mm")
-        _l("铣磨S2后 Tc", f"{r.tc_after_grind_s2:.3f}", "mm")
-        _l("细抛S1后 Tc (产品)", f"{r.tc_after_polish_s1:.3f}", "mm")
-        _l("细抛S2后 Tc (校验)", f"{r.tc_after_polish_s2:.3f}", "mm")
+
+        _h("去除量拆分")
+        _l("S1 精磨量", f"{r.grinding_s1:.2f}", "mm")
+        _l("S1 抛光量", f"{r.polishing_s1:.2f}", "mm")
+        _l("S2 精磨量", f"{r.grinding_s2:.2f}", "mm")
+        _l("S2 抛光量", f"{r.polishing_s2:.2f}", "mm")
+
+        _h("工序中厚")
+        _l("铣磨S1后 Tc", f"{r.tc_after_mill_s1:.3f}", "mm")
+        _l("铣磨S2后 Tc", f"{r.tc_after_mill_s2:.3f}", "mm")
+        _l("精抛S1后 Tc (产品)", f"{r.tc_after_grinding_s1:.3f}", "mm")
+        _l("精抛S2后 Tc (校验)", f"{r.tc_after_grinding_s2:.3f}", "mm")
 
         for side, label in (("s1", "S1"), ("s2", "S2")):
             _h(f"矢高 {label}")
@@ -516,7 +612,6 @@ class ProcessPlanApp:
             _l("A级样板精度", f"{getattr(r, f'{side}_sample_precision'):.4f}", "\u00b5m")
             _l("\u0394R(含样板)", f"{getattr(r, f'{side}_dr_with_sample'):.4f}", "mm")
             _l("\u0394R(不含样板)", f"{getattr(r, f'{side}_dr_no_sample'):.4f}", "mm")
-            _l("\u0394R(旧公式)", f"{getattr(r, f'{side}_dr_old'):.4f}", "mm")
             _l("R值上限", f"{getattr(r, f'{side}_upper'):.4f}", "mm")
             _l("R值下限", f"{getattr(r, f'{side}_lower'):.4f}", "mm")
             _l("实际上/下限",

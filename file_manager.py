@@ -27,6 +27,10 @@ class FileManager(ttk.Frame):
 
     是一个可嵌入的 ttk.Frame，自动绑定 Combobox 下拉文件和
     三个操作按钮（加载 / 保存为 / 浏览）。
+
+    注意:
+        field_schema.json 被保护，不会出现在下拉框中，
+        也无法通过「保存为」覆盖，防止误操作。
     """
 
     def __init__(
@@ -53,6 +57,8 @@ class FileManager(ttk.Frame):
         self._on_load = on_load
         self._on_save = on_save
         self._set_status = set_status
+        self.current_file: str | None = None
+        self._protected_files = {"field_schema.json"}
         self._build(bg)
 
     # ── 控件构建 ──────────────────────────────
@@ -94,10 +100,11 @@ class FileManager(ttk.Frame):
     # ── 公有方法 ───────────────────────────────
 
     def refresh_file_list(self):
-        """扫描 script_dir 下所有 .json 并填充到 Combobox。"""
+        """扫描 script_dir 下所有 .json 并填充到 Combobox（排除受保护文件）。"""
         pattern = os.path.join(self._script_dir, "*.json")
         files = sorted(glob.glob(pattern))
-        names = [os.path.basename(f) for f in files]
+        names = [os.path.basename(f) for f in files
+                 if os.path.basename(f) not in self._protected_files]
         self._combo["values"] = names
         if names:
             self._combo.set(names[0])
@@ -121,23 +128,27 @@ class FileManager(ttk.Frame):
 
     def _on_save_as(self):
         path = filedialog.asksaveasfilename(
-            title="保存项目为",
+            title="保存项目文件",
             defaultextension=".json",
             filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
             initialdir=self._script_dir,
         )
         if not path:
             return
-        try:
-            if self._on_save:
-                self._on_save(path)
-            self.refresh_file_list()
-            name = os.path.basename(path)
-            self._combo.set(name)
-            if self._set_status:
-                self._set_status(f"已保存至 {name}")
-        except Exception as e:
-            messagebox.showerror("保存失败", str(e))
+        name = os.path.basename(path)
+        # 阻止覆盖受保护文件
+        if name in self._protected_files:
+            messagebox.showwarning(
+                "文件受保护",
+                f"{name} 是系统配置文件，不能通过「保存为」覆盖。")
+            return
+        if self._on_save:
+            self._on_save(path)
+        self.current_file = path
+        self.refresh_file_list()
+        self._combo.set(name)
+        if self._set_status:
+            self._set_status(f"已保存至 {name}")
 
     def _on_load_preset(self):
         path = filedialog.askopenfilename(
@@ -150,11 +161,17 @@ class FileManager(ttk.Frame):
         self._invoke_load(path)
 
     def _invoke_load(self, path: str):
+        name = os.path.basename(path)
+        if name in self._protected_files:
+            messagebox.showwarning(
+                "文件受保护",
+                f"{name} 是系统配置文件，不能作为项目文件加载。")
+            return
         try:
             if self._on_load:
                 self._on_load(path)
+            self.current_file = path
             self.refresh_file_list()
-            name = os.path.basename(path)
             self._combo.set(name)
         except Exception as e:
             messagebox.showerror("加载失败", str(e))
