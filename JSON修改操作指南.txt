@@ -1,0 +1,307 @@
+══════════════════════════════════════════════════════════════════
+              JSON 修改操作指南 — Process Card 工艺卡片
+══════════════════════════════════════════════════════════════════
+
+本文档说明三个 JSON 配置文件的用途、修改方法和注意事项。
+
+
+┌─────────────────────────────────────────────────────────────────┐
+│  目录                                                            │
+│  1. 三个 JSON 文件的分工                                          │
+│  2. field_schema.json  — 用户输入字段 + 占位符定义                │
+│  3. export_layout.json  — Excel 布局                             │
+│  4. manufacturing_process.json — 工序模板                        │
+│  5. 常见注意事项                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║  1. 三个 JSON 文件的分工                                       ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  field_schema.json          ← 用户输入字段定义 + 占位符系统
+  export_layout.json         ← Excel 表格布局（列宽、单元格位置、样式）
+  manufacturing_process.json ← 工序流程模板
+
+  数据流方向：
+
+  field_schema.json  ──export_ctx──→  ${xxx} 占位符 ──→  _make_ctx()
+                                                              ↓
+  export_layout.json    ──cells────→  "${xxx}" ──→  _resolve()    → Excel
+  manufacturing_process →  requires →  "${xxx}" ──→  _resolve()
+
+  即：export_layout.json 和 manufacturing_process.json 中的 ${xxx}
+  都由 field_schema.json 的 export_ctx 统一提供值。
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║  2. field_schema.json — 用户输入字段 + 占位符定义              ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  2.1 文件位置
+      Process Card/field_schema.json
+
+  2.2 结构总览
+      {
+        "gui_sections": [ ... ],     ← GUI 输入面板分组（与计算无关可跳过）
+        "export_ctx":   [ ... ],     ← ★ 占位符定义（核心）
+        "validate_rules": [ ... ]    ← 输入校验规则
+      }
+
+  2.3 export_ctx — 占位符定义（核心）
+
+      每一条占位符定义的格式：
+      {
+        "ctx": "${focal}",          ← 占位符名称，用于 ${xxx} 引用
+        "source": "result",         ← 数据来源："params" 或 "result"
+        "attr": "focal_length",     ← LensParams 或 CalcResult 中的字段名
+        "fmt": ".1f",               ← 格式化字符串（Python format 语法）
+        "prefix": "IRR：",          ← 可选，值前面的固定文本
+        "suffix": "λ",              ← 可选，值后面的固定文本
+        "hide_zero": true           ← 可选，值为 0 时显示空白
+      }
+
+  2.4 常用 fmt 格式
+
+      fmt      含义              示例
+      ──────── ───────────────── ──────────
+      "s"      原样字符串         "戴磊"
+      ".0f"    整数               5
+      ".1f"    一位小数           48.0
+      ".3f"    三位小数           14.890
+      ".4f"    四位小数           395.9170
+
+  2.5 如果想新增占位符
+
+      例如：需要一个新的占位符 ${my_field}
+
+      第一步，确保 LensParams 或 CalcResult 中有该字段。
+      如果没有，先在 lens_calc.py 中添加。
+
+      第二步，在 export_ctx 中注册：
+      {
+        "ctx": "${my_field}",
+        "source": "params",        ← 来自 LensParams 用 "params"，来自
+        "attr": "my_field",         CalcResult 用 "result"
+        "fmt": ".2f"
+      }
+
+      第三步，在 export_layout.json 或 manufacturing_process.json 中用
+      ${my_field} 引用即可。
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║  3. export_layout.json — Excel 布局                            ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  3.1 文件位置
+      Process Card/export_layout.json
+
+  3.2 结构总览
+      {
+        "sheet_name": "工艺卡",        ← Excel 工作表名称
+        "column_widths": {"A":12,...}, ← 列宽（单位：字符数）
+        "row_heights": {"1":28,...},    ← 行高（单位：磅）
+        "merge_ranges": [...],         ← ★ 额外的合并范围（详见 3.6）
+        "cells": [...],                ← ★ 所有静态单元格定义
+        "footer": { ... }             ← ★ 页脚定义（详见 3.7）
+      }
+
+  3.3 cells — 单元格定义
+
+      每个单元格的格式：
+      {
+        "ref": "A1",                  ← Excel 引用（必需）
+        "value": "球面透镜加工工艺卡",   ← 文本或 ${xxx} 占位符（必需）
+        "style": "title",             ← 样式名（必需，见 3.4）
+        "fill": "yellow",             ← 可选，填充色名（见 3.5）
+        "merge": "A1:H2"              ← 可选，合并范围
+      }
+
+  3.4 可用 style（字体样式）
+
+      样式名     字体                     用途
+      ────────  ────────────────────────  ────────────
+      title     等线 16pt 粗体             卡片大标题
+      sec       等线 14pt 粗体             分区标题
+      lbl       等线 12pt 粗体             材料/图号标签
+      bold11    等线 11pt 粗体             列头/数值（默认）
+      bold10    等线 10pt 粗体             HK/FA 小字
+      11        等线 11pt 常规             表体内容
+
+  3.5 可用 fill（填充色）
+
+      填充名    颜色       用途
+      ────────  ─────────  ────────────
+      h1        #D9E1F4    表头 A-E（蓝灰）
+      h2        #E3F2D9    表头 F-J（浅绿）
+      h3        #DCE6F2    表头 K-M（淡蓝灰）
+      yellow    #FFFF00    黄色底色
+      orange    #FFC000    橙色底色
+
+  3.6 merge_ranges — 额外合并范围
+
+      此处的合并范围会在 cells 全部渲染完成后执行，适用于需要先写入
+      所有单元格再合并的场景（避免 MergedCell 报错）。
+
+      格式：字符串数组，如
+      "merge_ranges": ["D4:D5", "E4:E5"]
+
+  3.7 footer — 页脚定义（使用 {last_row+N} 语法）
+
+      页脚使用相对行号，因为工序行数在运行时才确定。
+
+      语法：
+        {last_row+3} 表示 工序最后一行 + 3
+
+      每行的格式：
+      {
+        "cells": [                    ← 该行所有单元格
+          {"ref": "A{last_row+3}",    ← ref 支持 {last_row+N}
+           "value": "变更记录",
+           "style": "sec",
+           "merge": "A{last_row+3}:O{last_row+3}"}
+        ],
+        "merges": [                   ← 该行额外的合并范围
+          "B{last_row+4}:I{last_row+4}"
+        ],
+        "row_height": 24              ← 可选，行高
+      }
+
+      特殊占位符 "${today}" 在页脚中自动解析为当天日期（如 2026.6.5）。
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║  4. manufacturing_process.json — 工序模板                      ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  4.1 文件位置
+      Process Card/manufacturing_process.json
+
+  4.2 结构总览
+      [
+        {
+          "bay": "成形",             ← 车间/工段名
+          "process": "成形",          ← 工序名称
+          "obj": "",                 ← 加工对象（S1/S2）
+          "requires": [              ← 技术要求列表（支持 ${xxx}）
+            "1.材料：${material}",
+            "2.领取平滚件..."
+          ]
+        },
+        ...
+      ]
+
+  4.3 添加/删除/修改工序
+
+      - 数组中的每个对象是一条工序
+      - 同一个 bay（车间）的连续工序会在 Excel 中自动合并单元格
+      - 如果 obj 不为空（"S1" 或 "S2"），会在工序行首显示对象名
+
+  4.4 requires 中的占位符
+
+      所有 ${xxx} 都会自动替换，可用的占位符见 field_schema.json
+      中的 export_ctx。如需新增，先在 export_ctx 中注册。
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║  5. 常见注意事项                                               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  ─── 注意事项 1：合并后的单元格变为只读 ───
+
+  Excel 中，一旦两个单元格被合并（merge），合并区域中除左上角外的
+  所有单元格都变成 MergedCell，不可再写入值。
+
+  例如：
+    "merge": "K10:L10"       ← 合并 K10:L10
+    之后再写 _cell(ws, "L10", ...) → ❌ 报错！
+
+  ✅ 正确做法：先写入 K10 的值，再合并 K10:L10。
+  ✅ 在 export_layout.json 中只需写 K10 的 value，merge 会自动处理。
+
+  ⚠ 特别提醒 O4:O5 的合并：
+    当前的代码流程是先写 O4，再 merge O4:O5。
+    不要在 layout JSON 中为 O4 写 merge 属性，也不要在 merge_ranges
+    中加入 O4:O5。这一合并是在 Python 代码中特殊处理的。
+
+  ─── 注意事项 2：JSON 文件编码 ───
+
+  JSON 文件必须使用 UTF-8 编码。修改后不要在文件头添加 BOM。
+  JSON 中直接写中文字符，不需要转义（如 "工艺卡号" 而非 "\u5de5..."）。
+
+  ─── 注意事项 3：JSON 语法校验 ───
+
+  修改后可用在线 JSON 校验工具验证，常见错误：
+    ❌ 忘记逗号：  {"a":1  {"b":2}   →  {"a":1, {"b":2}
+    ❌ 多余逗号：  [1,2,]            →  [1,2]
+    ❌ 键名没有双引号： {a: "b"}     →  {"a": "b"}
+
+  ─── 注意事项 4：{last_row+N} 中的 N 必须为正整数 ───
+
+  ✅ {last_row+3}
+  ❌ {last_row-1}     ← 不支持减法
+  ❌ {last_row+0.5}   ← 不支持小数
+  ❌ {last_row}       ← 不加 +N 不会被识别
+
+  ─── 注意事项 5：修改后需要重启程序才能生效 ───
+
+  三个 JSON 文件都在程序启动时一次性加载。修改后需关闭并重新打开
+  ProcessCard.exe 才能看到效果。
+
+  ─── 注意事项 6：style 和 fill 不能随意写 ───
+
+  style 只能写 3.4 节中列出的名称。
+  fill 只能写 3.5 节中列出的名称。
+  写错不会报错，但单元格会没有样式（使用默认 bold11 和无填充）。
+
+  ─── 注意事项 7：占位符必须已在 export_ctx 中注册 ───
+
+  在 cells 的 value 或 requires 中写了 ${xxx} 但对应的 xxx 没有在
+  field_schema.json 的 export_ctx 中注册 → 占位符不会被替换，会原样
+  显示（如 "${my_var}"）。
+
+  ─── 注意事项 8：带逻辑的单元格由 Python 代码控制 ───
+
+  以下单元格不在 export_layout.json 中，由 Python 代码生成：
+    F4 / F5   — R 值，R=0 时显示"平面"
+    J4 / J5   — 面形，IRR 和 RMS 的条件组合
+    O4        — 单位 "mm" + O4:O5 合并
+
+  ─── 注意事项 9：合并范围不要重复 ───
+
+  同一个单元格不能同时出现在多个 merge 中。
+  例如 cells 中已有 "merge": "A3:A5"，就不能在 merge_ranges 中再加
+  "A3:A5"。
+
+  ─── 注意事项 10：打包后 JSON 在外部的处理 ───
+
+  如果使用 PyInstaller 打包，field_schema.json 和 export_layout.json
+  会嵌入 exe 内部。首次运行时会自动复制到 exe 同目录下，之后修改
+  外部文件才会生效。manufacturing_process.json 同理。
+
+
+══════════════════════════════════════════════════════════════════
+  附录：快速修改场景示例
+══════════════════════════════════════════════════════════════════
+
+  场景 1：修改列宽
+    在 export_layout.json 中找到 column_widths，修改对应的字母值。
+    例如 "E": 50 → "E": 60（将技术参数列从 50 改为 60 字符宽）
+
+  场景 2：修改单元格文字
+    在 export_layout.json 的 cells 中找到对应 ref，修改 value。
+    例如改表头：{"ref": "I3", "value": "透射偏心"} → 改 value 即可。
+
+  场景 3：添加一列
+    1. 在 column_widths 中增加列宽（如 "P": 18）
+    2. 在 cells 中增加此列各行的单元格定义
+    3. 注意合并范围是否需要调整
+
+  场景 4：修改工序技术要求
+    在 manufacturing_process.json 中找到对应工序，修改 requires 数组。
+
+  场景 5：添加新字段到工艺卡
+    1. 确保 lens_calc.py 中有该字段
+    2. 在 field_schema.json 的 export_ctx 中注册占位符
+    3. 在 export_layout.json 或 manufacturing_process.json 中使用

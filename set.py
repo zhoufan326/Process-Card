@@ -7,6 +7,7 @@ class TaskGroup:
     process: str = ""
     obj: str = ""
     requires: list[str] = field(default_factory=list)
+    row_height: int | float | None = None
 
 
 Tasks: list[TaskGroup] = []
@@ -23,6 +24,7 @@ def load_preset(json_path: str):
             process=group["process"],
             obj=group.get("obj", ""),
             requires=list(group["requires"]),
+            row_height=group.get("row_height"),
         ))
 
 

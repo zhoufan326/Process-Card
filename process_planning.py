@@ -10,6 +10,8 @@ import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+os.environ.setdefault("MPLBACKEND", "TkAgg")  # 强制 TkAgg，避免打包拖入 Qt
+
 try:
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -39,7 +41,7 @@ FONT = "Microsoft YaHei"
 class ProcessPlanApp:
     """球面透镜工艺计算 GUI。"""
 
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk | tk.Toplevel):
         self.root = root
         self._params = LensParams()
         self._last_result = None
@@ -53,12 +55,12 @@ class ProcessPlanApp:
         r.minsize(900, 500)
         r.configure(bg=CLR_PAPER)
 
-        h = tk.Frame(r, bg=CLR_HEADER, height=34)
+        h = tk.Frame(r, bg=CLR_HEADER, height=38)
         h.pack(fill="x")
         h.pack_propagate(False)
         tk.Label(h, text="\u25a0  球面透镜工艺方案设计计算",
-                 font=(FONT, 11, "bold"), fg=CLR_TEXT, bg=CLR_HEADER).pack(
-                     side="left", padx=14, pady=5)
+                 font=(FONT, 12, "bold"), fg=CLR_ACCENT, bg=CLR_HEADER).pack(
+                     side="left", padx=16, pady=6)
 
         main = tk.Frame(r, bg=CLR_PAPER)
         main.pack(fill="both", expand=True, padx=8, pady=4)
@@ -91,27 +93,21 @@ class ProcessPlanApp:
         self._result.pack(fill="both", expand=True, padx=2, pady=2)
 
     def _build_footer(self, root):
-        bf = tk.Frame(root, bg=CLR_HEADER, height=38)
+        bf = tk.Frame(root, bg=CLR_HEADER, height=40)
         bf.pack(fill="x")
         bf.pack_propagate(False)
+        btn_kw = dict(font=(FONT, 10, "bold"), bg=CLR_ACCENT, fg="white",
+                      relief="flat", cursor="hand2", bd=0,
+                      activebackground=CLR_ACCENT_HI, activeforeground="white")
         tk.Button(bf, text="开始计算", command=self._on_calculate,
-                  font=(FONT, 10, "bold"), bg=CLR_ACCENT, fg="white",
-                  relief="flat", cursor="hand2", bd=0,
-                  activebackground=CLR_ACCENT_HI, activeforeground="white",
-                  width=12).pack(side="left", padx=14, pady=4)
+                  **btn_kw, width=12).pack(side="left", padx=14, pady=5)
         tk.Button(bf, text="应用", command=self._on_apply,
-                  font=(FONT, 10), bg=CLR_ACCENT, fg="white",
-                  relief="flat", cursor="hand2", bd=0,
-                  activebackground=CLR_ACCENT_HI, activeforeground="white",
-                  width=12).pack(side="left", padx=4, pady=4)
+                  **btn_kw, width=12).pack(side="left", padx=4, pady=5)
         tk.Button(bf, text="展示计算过程", command=self._show_calculation_process,
-                  font=(FONT, 10), bg="#A1887F", fg="white",
-                  relief="flat", cursor="hand2", bd=0,
-                  activebackground=CLR_ACCENT_HI, activeforeground="white",
-                  width=14).pack(side="left", padx=4, pady=4)
+                  **btn_kw, width=14).pack(side="left", padx=4, pady=5)
         self._status = tk.StringVar(value="就绪 — 请输入参数后点击「开始计算」")
         tk.Label(bf, textvariable=self._status, font=(FONT, 9),
-                 fg=CLR_SUBTEXT, bg=CLR_HEADER, anchor="e").pack(side="right", padx=14, pady=4)
+                 fg=CLR_SUBTEXT, bg=CLR_HEADER, anchor="e").pack(side="right", padx=16, pady=5)
 
     # ═══════════════════════════════════════════════
     #  Schema-Driven 输入面板构建
@@ -173,8 +169,12 @@ class ProcessPlanApp:
     #  应用按钮 → Read-Modify-Write 模式
     # ═══════════════════════════════════════════════
 
-    def _on_apply(self):
-        """将当前所有输入值持久化到 field_schema.json 的 default 字段。"""
+    def _on_apply(self, silent=False):
+        """将当前所有输入值持久化到 field_schema.json 的 default 字段。
+        
+        Args:
+            silent: 为 True 时不弹窗（由 _on_calculate 自动调用时使用）
+        """
         schema_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "field_schema.json")
@@ -215,18 +215,20 @@ class ProcessPlanApp:
                     time.sleep(0.5)
                 continue
         if success:
-            messagebox.showinfo(
-                "应用完成",
-                "当前参数已更新到 field_schema.json。\n返回主窗口后参数将同步显示。")
+            if not silent:
+                messagebox.showinfo(
+                    "应用完成",
+                    "当前参数已更新到 field_schema.json。\n返回主窗口后参数将同步显示。")
             self._status.set("参数已应用")
         else:
-            messagebox.showerror(
-                "写入失败",
-                "无法写入 field_schema.json，文件可能被占用。\n\n"
-                "建议:\n"
-                "1. 关闭 VS Code 中 field_schema.json 的标签页\n"
-                "2. 关闭其他可能打开该文件的程序\n"
-                "3. 稍后重试")
+            if not silent:
+                messagebox.showerror(
+                    "写入失败",
+                    "无法写入 field_schema.json，文件可能被占用。\n\n"
+                    "建议:\n"
+                    "1. 关闭 VS Code 中 field_schema.json 的标签页\n"
+                    "2. 关闭其他可能打开该文件的程序\n"
+                    "3. 稍后重试")
 
     # ── 校验 & 计算 ──
 
@@ -286,6 +288,8 @@ class ProcessPlanApp:
         self._last_result = result
         self._display_result(result)
         self._status.set(f"计算完成 — 焦距={result.focal_length}mm")
+        # 自动保存输入值到 field_schema.json，供 gui.py 导出时读取
+        self._on_apply(silent=True)
 
     # ── 结果展示 ──
 

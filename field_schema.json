@@ -17,7 +17,7 @@
           "label": "R1 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": -430.797,
+          "default": 678.0,
           "_comment": "第1面曲率半径"
         },
         {
@@ -25,7 +25,7 @@
           "label": "R2 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 129.083,
+          "default": 345.0,
           "_comment": "第2面曲率半径"
         },
         {
@@ -145,7 +145,7 @@
           "attr": "s1_n",
           "label": "S1 光圈数 N",
           "type": "float",
-          "default": 2.0,
+          "default": 4.0,
           "_comment": "S1面牛顿环光圈数"
         },
         {
@@ -153,14 +153,14 @@
           "label": "S1 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.15,
+          "default": 0.9,
           "_comment": "S1面局部光圈不规则度"
         },
         {
           "attr": "s2_n",
           "label": "S2 光圈数 N",
           "type": "float",
-          "default": 2.0,
+          "default": 4.0,
           "_comment": "S2面牛顿环光圈数"
         },
         {
@@ -168,7 +168,7 @@
           "label": "S2 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.15,
+          "default": 0.9,
           "_comment": "S2面局部光圈不规则度"
         },
         {
@@ -192,7 +192,7 @@
           "label": "粗糙度 S1",
           "unit": "nm",
           "type": "float",
-          "default": 1.0,
+          "default": 5.0,
           "_comment": "S1面粗糙度要求"
         },
         {
@@ -200,7 +200,7 @@
           "label": "粗糙度 S2",
           "unit": "nm",
           "type": "float",
-          "default": 1.0,
+          "default": 5.0,
           "_comment": "S2面粗糙度要求"
         }
       ]
@@ -234,14 +234,14 @@
           "attr": "author",
           "label": "制定",
           "type": "str",
-          "default": "周凡",
+          "default": "戴磊",
           "_comment": "工艺制定人员"
         },
         {
           "attr": "reviewer",
           "label": "审核",
           "type": "str",
-          "default": "王千奥",
+          "default": "林远至",
           "_comment": "工艺审核人员"
         },
         {
@@ -504,7 +504,7 @@
       "ctx": "${focal}",
       "source": "result",
       "attr": "focal_length",
-      "fmt": ".1f"
+      "fmt": ".0f"
     },
     {
       "_comment": "下料 / 毛坯尺寸"
@@ -679,6 +679,60 @@
       "source": "params",
       "attr": "blank_t_tol",
       "fmt": ".2f"
+    },
+    {
+      "_comment": "基础标识字段（工艺卡表头）"
+    },
+    {
+      "ctx": "${lens_type}",
+      "source": "params",
+      "attr": "lens_type",
+      "fmt": "s"
+    },
+    {
+      "ctx": "${drawing_no}",
+      "source": "params",
+      "attr": "drawing_no",
+      "fmt": "s"
+    },
+    {
+      "ctx": "${card_no}",
+      "source": "params",
+      "attr": "card_no",
+      "fmt": "s"
+    },
+    {
+      "ctx": "${diameter}",
+      "source": "params",
+      "attr": "diameter",
+      "fmt": ".1f"
+    },
+    {
+      "ctx": "${tc}",
+      "source": "params",
+      "attr": "tc",
+      "fmt": ".3f"
+    },
+    {
+      "_comment": "制定/审核/批准人员"
+    },
+    {
+      "ctx": "${author}",
+      "source": "params",
+      "attr": "author",
+      "fmt": "s"
+    },
+    {
+      "ctx": "${reviewer}",
+      "source": "params",
+      "attr": "reviewer",
+      "fmt": "s"
+    },
+    {
+      "ctx": "${approver}",
+      "source": "params",
+      "attr": "approver",
+      "fmt": "s"
     }
   ],
   "validate_rules": [

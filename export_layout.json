@@ -1,0 +1,147 @@
+{
+  "_comment": "工艺卡 Excel 静态布局定义。使用 ${xxx} 占位符引用 field_schema.json export_ctx 中的值。",
+  "sheet_name": "工艺卡",
+  "column_widths": {
+    "A": 12, "B": 20, "C": 12, "D": 16, "E": 50, "F": 14, "G": 10,
+    "H": 15, "I": 20, "J": 20, "K": 15, "L": 15, "M": 15, "N": 15, "O": 15, "P": 15
+  },
+  "row_heights": {
+    "1": 28, "2": 28, "3": 32, "4": 28, "5": 28, "6": 28, "7": 28,
+    "8": 24, "9": 22, "10": 22, "11": 22, "12": 30
+  },
+  "merge_ranges": [
+    "D4:D5", "E4:E5", "L4:M4", "L5:M5"
+  ],
+  "cells": [
+    {"ref": "A1", "value": "球面透镜加工工艺卡", "style": "title", "merge": "A1:H2"},
+    {"ref": "I1", "value": "材料",           "style": "lbl"},
+    {"ref": "J1", "value": "产品类型",       "style": "lbl", "merge": "J1:K1"},
+    {"ref": "L1", "value": "图号",           "style": "lbl", "merge": "L1:M1"},
+    {"ref": "N1", "value": "工艺卡号",       "style": "lbl", "merge": "N1:O1"},
+
+    {"ref": "I2", "value": "${material}",    "style": "lbl"},
+    {"ref": "J2", "value": "${lens_type}",   "style": "lbl", "merge": "J2:K2"},
+    {"ref": "L2", "value": "${drawing_no}",  "style": "lbl", "merge": "L2:M2"},
+    {"ref": "N2", "value": "${card_no}",     "style": "lbl", "merge": "N2:O2"},
+
+    {"ref": "A3", "value": "技术指标",       "style": "bold11", "merge": "A3:A5"},
+    {"ref": "B3", "value": "面次",           "style": "bold11"},
+    {"ref": "C3", "value": "加工方式",       "style": "bold11"},
+    {"ref": "D3", "value": "尺寸",           "style": "bold11"},
+    {"ref": "E3", "value": "焦距",           "style": "bold11"},
+    {"ref": "F3", "value": "R值",            "style": "bold11"},
+    {"ref": "G3", "value": "S/D",            "style": "bold11"},
+    {"ref": "H3", "value": "CA",             "style": "bold11"},
+    {"ref": "I3", "value": "透射偏心",       "style": "bold11"},
+    {"ref": "J3", "value": "面形",           "style": "bold11"},
+    {"ref": "K3", "value": "崩边",           "style": "bold11"},
+    {"ref": "L3", "value": "倒角",           "style": "bold11"},
+    {"ref": "N3", "value": "粗糙度",         "style": "bold11"},
+    {"ref": "O3", "value": "单位",           "style": "bold11"},
+
+    {"ref": "B4", "value": "S1",             "style": "bold11"},
+    {"ref": "C4", "value": "抛光",           "style": "bold11"},
+    {"ref": "D4", "value": "Φ${diameter}×${tc}(Tc)",  "style": "bold11"},
+    {"ref": "E4", "value": "${focal}@589nm", "style": "bold11"},
+    {"ref": "G4", "value": "${SD_S1}",       "style": "bold11"},
+    {"ref": "H4", "value": "＞Φ${CA_S1}",    "style": "bold11"},
+    {"ref": "I4", "value": "＜${tilt_s1}′",  "style": "bold11"},
+    {"ref": "K4", "value": "＜${edge_chip}",  "style": "bold11"},
+    {"ref": "L4", "value": "${chamfer}",     "style": "bold11"},
+    {"ref": "N4", "value": "＜${roughness_s1}", "style": "bold11"},
+
+    {"ref": "B5", "value": "S2",             "style": "bold11"},
+    {"ref": "C5", "value": "抛光",           "style": "bold11"},
+    {"ref": "G5", "value": "${SD_S2}",       "style": "bold11"},
+    {"ref": "H5", "value": "＞Φ${CA_S2}",    "style": "bold11"},
+    {"ref": "I5", "value": "＜${tilt_s2}′",  "style": "bold11"},
+    {"ref": "K5", "value": "＜${edge_chip}",  "style": "bold11"},
+    {"ref": "L5", "value": "${chamfer}",     "style": "bold11"},
+    {"ref": "N5", "value": "＜${roughness_s2}", "style": "bold11"},
+
+    {"ref": "A6", "value": "镀膜指标",       "style": "bold11", "merge": "A6:A7"},
+    {"ref": "B6", "value": "${coating_spec}","style": "lbl",    "merge": "B6:H7"},
+    {"ref": "I6", "value": "DW耐水作用稳定性","style": "bold11"},
+    {"ref": "J6", "value": "DA耐酸作用稳定性","style": "bold11"},
+    {"ref": "K6", "value": "CR耐候性",       "style": "bold11"},
+    {"ref": "L6", "value": "RC耐潮稳定性",   "style": "bold11"},
+    {"ref": "M6", "value": "RA耐酸稳定性",   "style": "bold11"},
+    {"ref": "N6", "value": "HK努氏硬度",     "style": "bold11"},
+    {"ref": "N7", "value": "522kg/mm²",      "style": "bold10"},
+    {"ref": "O6", "value": "FA磨耗度",       "style": "bold11"},
+    {"ref": "O7", "value": "50",             "style": "bold10"},
+
+    {"ref": "A8", "value": "",               "style": "sec",   "fill": "yellow", "merge": "A8:O8"},
+    {"ref": "A9", "value": "球面透镜加工工艺卡", "style": "sec", "fill": "orange", "merge": "A9:C9"},
+    {"ref": "J9", "value": "版次",           "style": "bold11"},
+    {"ref": "K9", "value": "A",             "style": "bold11"},
+    {"ref": "L9", "value": "页次",           "style": "bold11"},
+    {"ref": "M9", "value": "1/1",           "style": "bold11"},
+    {"ref": "N9", "value": "工序名称",       "style": "bold11"},
+    {"ref": "O9", "value": "总流程",         "style": "bold11"},
+    {"ref": "A10", "value": "产品类型",      "style": "bold11", "fill": "orange"},
+    {"ref": "B10", "value": "图号",          "style": "bold11", "fill": "orange"},
+    {"ref": "C10", "value": "工艺卡号",      "style": "bold11", "fill": "orange"},
+    {"ref": "J10", "value": "制定",          "style": "bold11"},
+    {"ref": "J11", "value": "审核",          "style": "bold11"},
+    {"ref": "K10", "value": "${author}",     "style": "11",    "merge": "K10:L10"},
+    {"ref": "K11", "value": "${reviewer}",   "style": "11",    "merge": "K11:L11"},
+    {"ref": "N10", "value": "${approver}",   "style": "11",    "merge": "N10:O11"},
+    {"ref": "M10", "value": "批准",          "style": "bold11", "merge": "M10:M11"},
+    {"ref": "A11", "value": "${lens_type}",  "style": "bold11", "fill": "orange"},
+    {"ref": "B11", "value": "${drawing_no}", "style": "bold11", "fill": "orange"},
+    {"ref": "C11", "value": "${card_no}",    "style": "bold11", "fill": "orange"},
+
+    {"ref": "A12", "value": "序号",          "style": "bold11", "fill": "h1"},
+    {"ref": "B12", "value": "车间",          "style": "bold11", "fill": "h1"},
+    {"ref": "C12", "value": "工序",          "style": "bold11", "fill": "h1"},
+    {"ref": "D12", "value": "对象",          "style": "bold11", "fill": "h1"},
+    {"ref": "E12", "value": "技术参数",      "style": "bold11", "fill": "h1", "merge": "E12:G12"},
+    {"ref": "H12", "value": "备注",          "style": "bold11", "fill": "h2"},
+    {"ref": "J12", "value": "检验\n标准",    "style": "bold11", "fill": "h2"},
+    {"ref": "K12", "value": "设备",          "style": "bold11", "fill": "h3"},
+    {"ref": "L12", "value": "工装",          "style": "bold11", "fill": "h3"},
+    {"ref": "M12", "value": "图片",          "style": "bold11", "fill": "h3", "merge": "M12:O12"}
+  ],
+  "footer": {
+    "_comment": "页脚使用 {last_row+N} 相对行号，N 表示相对于上一条工序末行的偏移。",
+    "rows": [
+      {
+        "cells": [
+          {"ref": "A{last_row+3}", "value": "变更记录", "style": "sec", "merge": "A{last_row+3}:O{last_row+3}"}
+        ],
+        "row_height": 24
+      },
+      {
+        "cells": [
+          {"ref": "A{last_row+4}", "value": "版本",     "style": "bold11"},
+          {"ref": "B{last_row+4}", "value": "变更内容", "style": "bold11"},
+          {"ref": "J{last_row+4}", "value": "制/修订人","style": "bold11"},
+          {"ref": "K{last_row+4}", "value": "审核",     "style": "bold11"},
+          {"ref": "L{last_row+4}", "value": "批准",     "style": "bold11"},
+          {"ref": "M{last_row+4}", "value": "制/修订时间","style": "bold11"}
+        ],
+        "merges": [
+          "B{last_row+4}:I{last_row+4}",
+          "M{last_row+4}:O{last_row+4}"
+        ],
+        "row_height": 22
+      },
+      {
+        "cells": [
+          {"ref": "A{last_row+5}", "value": "A",          "style": "bold11"},
+          {"ref": "B{last_row+5}", "value": "新增",       "style": "bold11"},
+          {"ref": "J{last_row+5}", "value": "${author}",  "style": "11"},
+          {"ref": "K{last_row+5}", "value": "${reviewer}","style": "11"},
+          {"ref": "L{last_row+5}", "value": "${approver}","style": "11"},
+          {"ref": "M{last_row+5}", "value": "${today}",   "style": "11"}
+        ],
+        "merges": [
+          "B{last_row+5}:I{last_row+5}",
+          "M{last_row+5}:O{last_row+5}"
+        ],
+        "row_height": 22
+      }
+    ]
+  }
+}

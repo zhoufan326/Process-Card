@@ -58,63 +58,72 @@ LensParams = _make_lens_params()
 
 @dataclass
 class CalcResult:
-    """所有计算结果。"""
-    focal_length: float = 0.0
-    back_focal_s1: float = 0.0
-    back_focal_s2: float = 0.0
+    """所有计算结果 — 对应工艺卡(GUI右侧/Excel)中的计算输出项。"""
 
-    blank_diameter: float = 0.0
-    blank_thickness: float = 0.0
-    s1_ca_strict: float = 0.0
-    s2_ca_strict: float = 0.0
+    # ── 基本光学参数 ── (GUI右侧"基本光学参数"区域 / 工艺卡E4"焦距")
+    focal_length: float = 0.0          # 焦距 f (mm), 透镜制造者公式计算结果
+    back_focal_s1: float = 0.0         # 后焦距 BFL_S1 (mm), S1面方向的后截距
+    back_focal_s2: float = 0.0         # 后焦距 BFL_S2 (mm), S2面方向的后截距
 
-    tc_after_mill_s1: float = 0.0
-    tc_after_mill_s2: float = 0.0
-    tc_after_grinding_s1: float = 0.0
-    tc_after_grinding_s2: float = 0.0
+    # ── 下料 / 毛坯尺寸 ── (GUI右侧"下料/毛坯尺寸"区域 / 工艺卡D4"ΦD×Tc")
+    blank_diameter: float = 0.0        # 毛坯外径 (mm), = D + pre_edge
+    blank_thickness: float = 0.0       # 下料中心厚度 (mm), 各工序去除量累加
+    s1_ca_strict: float = 0.0          # S1 加严CA (mm), 按毛坯比例放大检测口径
+    s2_ca_strict: float = 0.0          # S2 加严CA (mm)
 
-    # 精磨 / 抛光（由总量 grinding_polishing 拆分得出）
-    grinding_s1: float = 0.0
-    grinding_s2: float = 0.0
-    polishing_s1: float = 0.0
-    polishing_s2: float = 0.0
+    # ── 工序厚度 ── (GUI右侧"工序中厚"区域)
+    tc_after_mill_s1: float = 0.0      # 铣磨S1后中心厚 (mm)
+    tc_after_mill_s2: float = 0.0      # 铣磨S2后中心厚 (mm)
+    tc_after_grinding_s1: float = 0.0  # 精抛S1后中心厚 (mm), 即产品最终Tc
+    tc_after_grinding_s2: float = 0.0  # 精抛S2后中心厚 (mm), 校验值与原始Tc一致
 
-    sag_s1: float = 0.0
-    sag_s2: float = 0.0
-    sag_diff_s1: float = 0.0
-    sag_diff_s2: float = 0.0
-    sag_max_s1: float = 0.0
-    sag_max_s2: float = 0.0
-    r_max_s1: float = 0.0
-    r_max_s2: float = 0.0
+    # ── 精磨量 / 抛光量拆分 ── (GUI右侧"去除量拆分"区域)
+    # polishing 固定为 0.02mm, grinding = grinding_polishing - polishing
+    grinding_s1: float = 0.0           # S1 精磨去除量 (mm)
+    grinding_s2: float = 0.0           # S2 精磨去除量 (mm)
+    polishing_s1: float = 0.0          # S1 抛光去除量 (mm), 固定 0.02
+    polishing_s2: float = 0.0          # S2 抛光去除量 (mm), 固定 0.02
 
-    r1_sample_precision: float = 0.0
-    r2_sample_precision: float = 0.0
-    r1_dr_with_sample: float = 0.0
-    r1_dr_no_sample: float = 0.0
-    r1_upper: float = 0.0
-    r1_lower: float = 0.0
-    r2_dr_with_sample: float = 0.0
-    r2_dr_no_sample: float = 0.0
-    r2_upper: float = 0.0
-    r2_lower: float = 0.0
-    r1_actual_upper: str = ""
-    r1_actual_lower: str = ""
-    r2_actual_upper: str = ""
-    r2_actual_lower: str = ""
+    # ── 矢高 ── (GUI右侧"矢高"区域 / 工艺卡间接体现)
+    sag_s1: float = 0.0                # S1 标准矢高 (mm), 由R₁和CA₁通过球面公式算出
+    sag_s2: float = 0.0                # S2 标准矢高 (mm)
+    sag_diff_s1: float = 0.0           # S1 最大矢高差 (mm), = N₁ × λ/2 (牛顿环光圈换算)
+    sag_diff_s2: float = 0.0           # S2 最大矢高差 (mm)
+    sag_max_s1: float = 0.0            # S1 最大矢高 (mm), = sag₁ + sag_diff₁
+    sag_max_s2: float = 0.0            # S2 最大矢高 (mm)
+    r_max_s1: float = 0.0              # S1 R最大值 (mm), 由sag_max₁反推的曲率半径
+    r_max_s2: float = 0.0              # S2 R最大值 (mm)
 
-    tilt_s1_per_mm: float = 0.0
-    tilt_s2_per_mm: float = 0.0
-    decent_s1_per_tilt: float = 0.0
-    decent_s2_per_tilt: float = 0.0
-    sphere_center_s1: float = 0.0
-    sphere_center_s2: float = 0.0
-    reflect_center_s1: float = 0.0
-    reflect_center_s2: float = 0.0
-    edge_thick_diff_s1: float = 0.0
+    # ── 曲率半径公差 ── (GUI右侧"曲率半径公差"区域 / 工艺卡F4/F5"R值")
+    r1_sample_precision: float = 0.0   # R₁ A级样板精度 (µm), 按|R|分五档
+    r2_sample_precision: float = 0.0   # R₂ A级样板精度 (µm)
+    r1_dr_with_sample: float = 0.0     # R₁ ΔR含样板 (mm), = |R_max-R| + 样板精度
+    r1_dr_no_sample: float = 0.0       # R₁ ΔR不含样板 (mm), 零件本身制造公差
+    r1_upper: float = 0.0              # R₁ 上限 (mm), = R₁ + ΔR(不含样板)
+    r1_lower: float = 0.0              # R₁ 下限 (mm), = R₁ - ΔR(不含样板)
+    r2_dr_with_sample: float = 0.0     # R₂ ΔR含样板 (mm)
+    r2_dr_no_sample: float = 0.0       # R₂ ΔR不含样板 (mm)
+    r2_upper: float = 0.0              # R₂ 上限 (mm)
+    r2_lower: float = 0.0              # R₂ 下限 (mm)
+    r1_actual_upper: str = ""          # R₁ 实际显示上限文本 (小R值→µm, 大R值→mm数值)
+    r1_actual_lower: str = ""          # R₁ 实际显示下限文本
+    r2_actual_upper: str = ""          # R₂ 实际显示上限文本
+    r2_actual_lower: str = ""          # R₂ 实际显示下限文本
 
-    tilt_from_center_s1: float = 0.0
-    tilt_from_center_s2: float = 0.0
+    # ── 偏心 / 面倾斜 ── (GUI右侧"偏心/面倾斜"区域 / 工艺卡I4/I5"透射偏心")
+    tilt_s1_per_mm: float = 0.0        # S1 面倾斜X ('/mm), 参考偏心c=0.008mm换算
+    tilt_s2_per_mm: float = 0.0        # S2 面倾斜X ('/mm)
+    decent_s1_per_tilt: float = 0.0    # S1 偏心差c (mm/@1'), 1′面倾斜对应的偏心量
+    decent_s2_per_tilt: float = 0.0    # S2 偏心差c (mm/@1')
+    sphere_center_s1: float = 0.0      # S1 球心距a (mm/@1'), 1′面倾斜对应的球心偏移
+    sphere_center_s2: float = 0.0      # S2 球心距a (mm/@1')
+    reflect_center_s1: float = 0.0     # S1 反射球心距 (mm), 用于镜面检测转换
+    reflect_center_s2: float = 0.0     # S2 反射球心距 (mm)
+    edge_thick_diff_s1: float = 0.0    # 边厚差Δt (mm/@0.004mm偏心), 工艺卡厚度均匀性参考
+
+    # ── 面倾斜(球心距反算) ── (GUI右侧"面倾斜(球心距反算)"区域)
+    tilt_from_center_s1: float = 0.0   # S1 面倾斜X ('), 由反射球心距反算得出
+    tilt_from_center_s2: float = 0.0   # S2 面倾斜X (')
 
 
 # ═══ 辅助函数 ═══

@@ -58,7 +58,7 @@ class FileManager(ttk.Frame):
         self._on_save = on_save
         self._set_status = set_status
         self.current_file: str | None = None
-        self._protected_files = {"field_schema.json"}
+        self._protected_files = {"field_schema.json", "export_layout.json"}
         self._build(bg)
 
     # ── 控件构建 ──────────────────────────────
@@ -86,15 +86,15 @@ class FileManager(ttk.Frame):
         tk.Button(
             self, text="保存为", width=6, font=("Microsoft YaHei", 9),
             command=self._on_save_as,
-            bg="#A1887F", fg="white", relief="flat", cursor="hand2",
-            activebackground="#795548", activeforeground="white",
+            bg="#8D6E63", fg="white", relief="flat", cursor="hand2",
+            activebackground="#6D4C41", activeforeground="white",
         ).grid(row=0, column=3, padx=2)
 
         tk.Button(
             self, text="浏览", width=6, font=("Microsoft YaHei", 9),
             command=self._on_load_preset,
-            bg="#D7CCC8", fg="#5D4037", relief="flat", cursor="hand2",
-            activebackground="#BCAAA4", activeforeground="#3E2723",
+            bg="#8D6E63", fg="white", relief="flat", cursor="hand2",
+            activebackground="#6D4C41", activeforeground="white",
         ).grid(row=0, column=4, padx=2)
 
     # ── 公有方法 ───────────────────────────────

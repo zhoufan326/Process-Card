@@ -38,8 +38,7 @@ CLR_TEXT = "#3E2723"      # 正文 – 深墨色
 CLR_SUBTEXT = "#5D4037"   # 辅助文字 – 焦茶色
 CLR_ACCENT = "#8D6E63"    # 按钮主色 – 驼棕色
 CLR_ACCENT_HI = "#6D4C41" # 按钮悬停 – 深棕
-CLR_SECOND = "#A1887F"    # 按钮次色
-CLR_LIGHT = "#D7CCC8"     # 按钮浅色
+CLR_LIGHT = "#D7CCC8"     # 浅色装饰 – 米灰
 CLR_TREE_GROUP = "#EDE0D4"  # Treeview 组行 – 浅砂
 CLR_TREE_REQ = "#FDF8F2"    # Treeview 子行 – 米白
 CLR_TREE_SEL = "#D4E6C3"    # 选中行 – 青瓷绿
@@ -55,12 +54,12 @@ FONT = "Microsoft YaHei"
 # 辅助函数
 # ──────────────────────────────────────────────
 
-def _btn(parent, text, command, *, color=CLR_ACCENT, fg="white", width=9, **kw):
+def _btn(parent, text, command, **kw):
     """创建风格统一的按钮。"""
     return tk.Button(
-        parent, text=text, command=command, width=width,
-        font=(FONT, 9), bg=color, fg=fg,
-        relief="flat", cursor="hand2", bd=0,
+        parent, text=text, command=command,
+        font=(FONT, 9), bg=CLR_ACCENT, fg="white",
+        relief="flat", cursor="hand2", bd=0, padx=8, pady=3,
         activebackground=CLR_ACCENT_HI, activeforeground="white",
         **kw,
     )
@@ -123,13 +122,13 @@ class TaskApp:
     # ── 标题栏 ────────────────────────────────
 
     def _build_header(self):
-        h = tk.Frame(self.root, bg=CLR_HEADER, height=36)
+        h = tk.Frame(self.root, bg=CLR_HEADER, height=40)
         h.grid(row=0, column=0, columnspan=2, sticky="ew")
         h.grid_propagate(False)
         tk.Label(
             h, text=chr(0x25A0) + "  Process Card  —  流程卡片管理",
-            font=(FONT, 12, "bold"), fg=CLR_TEXT, bg=CLR_HEADER,
-        ).pack(side="left", padx=14, pady=6)
+            font=(FONT, 13, "bold"), fg=CLR_ACCENT, bg=CLR_HEADER,
+        ).pack(side="left", padx=16, pady=8)
 
     # ── 主体区域 ──────────────────────────────
 
@@ -141,7 +140,7 @@ class TaskApp:
 
         # 子标题
         tk.Label(left, text="\u25a0 工序编辑",
-                 font=(FONT, 11, "bold"), fg=CLR_TEXT, bg=CLR_HEADER,
+                 font=(FONT, 11, "bold"), fg=CLR_ACCENT, bg=CLR_HEADER,
                  anchor="w", padx=14).pack(fill="x", ipady=6)
 
         # 文件管理栏嵌入
@@ -192,7 +191,7 @@ class TaskApp:
         right.grid_columnconfigure(0, weight=1)
 
         tk.Label(right, text="\u25a0 流程工序",
-                 font=(FONT, 11, "bold"), fg=CLR_TEXT, bg=CLR_HEADER,
+                 font=(FONT, 11, "bold"), fg=CLR_ACCENT, bg=CLR_HEADER,
                  anchor="w", padx=14).grid(row=0, column=0, sticky="ew", ipady=6)
 
         # ── Treeview 区域 ──
@@ -234,7 +233,7 @@ class TaskApp:
             ).grid(row=row, column=0, padx=(0, 6), pady=PAD_Y, sticky="e")
             ent = tk.Entry(
                 frm, font=(FONT, 10), width=22,
-                bg="white", fg=CLR_TEXT, relief="solid", bd=1,
+                bg=CLR_LIGHT, fg=CLR_TEXT, relief="flat", bd=0,
                 insertbackground=CLR_ACCENT,
             )
             ent.grid(row=row, column=1, sticky="ew", pady=PAD_Y)
@@ -247,7 +246,7 @@ class TaskApp:
         ).grid(row=3, column=0, padx=(0, 6), pady=PAD_Y, sticky="ne")
         self.req_text = tk.Text(
             frm, font=(FONT, 10), width=30, height=5,
-            bg="white", fg=CLR_TEXT, relief="solid", bd=1,
+            bg=CLR_LIGHT, fg=CLR_TEXT, relief="flat", bd=6,
             wrap="word", insertbackground=CLR_ACCENT,
         )
         self.req_text.grid(row=3, column=1, columnspan=2, sticky="ew", pady=PAD_Y)
@@ -258,28 +257,28 @@ class TaskApp:
         bf = tk.Frame(parent, bg=CLR_PANEL)
         bf.grid(row=8, column=0, sticky="ew", padx=14, pady=(0, 10))
 
-        _btn(bf, "新建组", self._on_new, color=CLR_SECOND, width=9).grid(row=0, column=0, padx=2, pady=2)
-        _btn(bf, "+ 要求", self._on_add_req, color=CLR_LIGHT, fg=CLR_SUBTEXT, width=9).grid(row=0, column=1, padx=2, pady=2)
-        _btn(bf, "删 除", self._on_delete, color=CLR_LIGHT, fg=CLR_SUBTEXT, width=9).grid(row=1, column=1, padx=2, pady=2)
+        _btn(bf, "新建组", self._on_new, width=9).grid(row=0, column=0, padx=2, pady=2)
+        _btn(bf, "+ 要求", self._on_add_req, width=9).grid(row=0, column=1, padx=2, pady=2)
+        _btn(bf, "删 除", self._on_delete, width=9).grid(row=1, column=1, padx=2, pady=2)
 
-        _btn(bf, "导出工艺卡", self._on_export, color=CLR_HEADER, fg=CLR_TEXT, width=20).grid(
+        _btn(bf, "导出工艺卡", self._on_export, width=20).grid(
             row=2, column=0, columnspan=2, padx=2, pady=(6, 2), sticky="ew"
         )
-        _btn(bf, "工艺计算", self._on_process_calc, color=CLR_ACCENT, fg="white", width=20).grid(
+        _btn(bf, "工艺计算", self._on_process_calc, width=20).grid(
             row=3, column=0, columnspan=2, padx=2, pady=2, sticky="ew"
         )
 
     # ── 底部状态栏 ────────────────────────────
 
     def _build_footer(self):
-        ft = tk.Frame(self.root, bg=CLR_HEADER, height=28)
+        ft = tk.Frame(self.root, bg=CLR_HEADER, height=30)
         ft.grid(row=1, column=0, columnspan=2, sticky="ew")
         ft.grid_propagate(False)
         self.status_var = tk.StringVar(value="就绪")
         tk.Label(
             ft, textvariable=self.status_var, anchor="w",
             font=(FONT, 9), fg=CLR_SUBTEXT, bg=CLR_HEADER,
-        ).pack(side="left", padx=14, pady=4)
+        ).pack(side="left", padx=16, pady=5)
 
     # ── 拖拽控制器 ────────────────────────────
 
@@ -631,7 +630,9 @@ class TaskApp:
             return
         try:
             from process_card_exporter import export_process_card
-            result = export_process_card(filepath)
+            from lens_calc import LensParams
+            p = LensParams()  # 读取 field_schema.json 中的当前值
+            result = export_process_card(filepath, lens_params=p)
             messagebox.showinfo("导出完成",
                                 f"工艺卡片已生成:\n{filepath}")
             self._set_status(f"工艺卡已导出")
@@ -645,13 +646,32 @@ class TaskApp:
 
     def _on_process_calc(self):
         """打开工艺计算窗口。返回主窗口后将检测更新并同步。"""
-        import subprocess, sys
-        script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                              "process_planning.py")
+        import sys as _sys
+        # ── 打包环境: 直接在同一进程打开 ──
+        if getattr(_sys, 'frozen', False):
+            try:
+                from process_planning import ProcessPlanApp
+                # 使用 Toplevel 子窗口而非 Tk()，避免 tkinter 控件路径冲突
+                calc_root = tk.Toplevel(self.root)
+                calc_root.transient(self.root)    # 设为父窗口的子窗口
+                calc_root.grab_set()              # 模态：禁止操作主窗口
+                ProcessPlanApp(calc_root)
+                self.root.wait_window(calc_root)  # 等待子窗口关闭，不阻塞主事件循环
+                # 关闭后同步
+                self._invalidate_ctx_cache()
+                self._refresh_tree()
+                self._set_status("参数已同步")
+            except Exception as e:
+                messagebox.showerror("启动失败", f"无法打开工艺计算:\n{e}")
+            return
+
+        # ── 开发环境: 子进程方式 ──
+        import subprocess
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "process_planning.py")
         self._schema_mtime_before = os.path.getmtime(
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json"))
         try:
-            subprocess.Popen([sys.executable, script])
+            subprocess.Popen([_sys.executable, script])
             self._set_status("已打开工艺计算窗口（关闭后将自动同步）")
             self.root.after(500, self._check_process_calc_closed)
         except Exception as e:
