@@ -17,7 +17,7 @@
           "label": "R1 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": -439.797,
+          "default": -430.797,
           "_comment": "第1面曲率半径"
         },
         {
@@ -48,7 +48,7 @@
           "attr": "n",
           "label": "折射率 n",
           "type": "float",
-          "default": 1.458406,
+          "default": 1.458413,
           "_comment": "设计波长下的折射率"
         },
         {
@@ -213,7 +213,7 @@
           "attr": "lens_type",
           "label": "产品类型",
           "type": "str",
-          "default": "双凸透镜",
+          "default": "弯月透镜",
           "_comment": "透镜类型，如双凸透镜、平凸透镜等"
         },
         {

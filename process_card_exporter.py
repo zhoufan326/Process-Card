@@ -15,7 +15,7 @@ from openpyxl.styles import PatternFill, Alignment, Border, Side, Font
 from openpyxl.utils import get_column_letter
 
 from set import Tasks, load_preset
-from process_planning import LensParams, CalcResult, calculate
+from lens_calc import LensParams, CalcResult, calculate
 
 # ═══ Schema ═══
 def _load_schema() -> dict:
@@ -33,8 +33,8 @@ _F = {
     "sec":    Font(name="等线", size=14, bold=True),  # 分区标题
     "lbl":    Font(name="等线", size=12, bold=True),  # 材料/图号/镀膜
     "bold11": Font(name="等线", size=11, bold=True),  # 列头/数值/表体
-    "b10":    Font(name="等线", size=10, bold=True),  # HK/FA
-    "p":      Font(name="等线", size=11),              # 表体非粗
+    "bold10": Font(name="等线", size=10, bold=True),  # HK/FA
+    "11":     Font(name="等线", size=11)              # 表体非粗
 }
 _FILL_NONE = PatternFill(fill_type=None)
 _FL = {
@@ -104,7 +104,7 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
     
     # ── 列宽 ──
     for l, w in {"A":12,"B":20,"C":12,"D":16,"E":50,"F":14,"G":10,
-                 "H":15,"I":15,"J":15,"K":15,"L":15,"M":15,"N":15,"O":15,"P":15}.items():
+                 "H":15,"I":20,"J":20,"K":15,"L":15,"M":15,"N":15,"O":15,"P":15}.items():
         ws.column_dimensions[get_column_letter(openpyxl.utils.cell.column_index_from_string(l))].width = w
 
    
@@ -162,7 +162,10 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
     _cell(ws, "K4", f"\uff1c{p.edge_chip}",                   font=_F["bold11"])
     _cell(ws, "L4", p.chamfer,                                font=_F["bold11"])
     _cell(ws, "N4", f"\uff1c{p.s1_rms}nm",                  font=_F["bold11"])
-    _cell(ws, "O4", "nm / ' / mm",                          font=_F["bold11"])
+    _cell(ws, "O4", "mm",                          font=_F["bold11"]); ws.merge_cells("O4:O5")
+    #-先写 O4 为 "mm" ，然后立即 merge_cells("O4:O5") → O5 变成了 MergedCell
+    #-再次写 O5 为 "nm / ' / mm" → MergedCell 不可写入，报错
+    
     ws.row_dimensions[4].height = 28
 
     # 行5 S2
@@ -176,7 +179,7 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
     _cell(ws, "K5", f"\uff1c{p.edge_chip}",                   font=_F["bold11"])
     _cell(ws, "L5", p.chamfer,                                font=_F["bold11"])
     _cell(ws, "N5", f"\uff1c{p.s2_rms}nm",                  font=_F["bold11"])
-    _cell(ws, "O5", "nm / ' / mm",                          font=_F["bold11"])
+
     ws.row_dimensions[5].height = 28
 
     # 行6-7: 镀膜指标
@@ -189,8 +192,8 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
     _cell(ws, "M6", "RA耐酸稳定性",     font=_F["bold11"])
     ws.row_dimensions[6].height = 28
 
-    _cell(ws, "N6", "HK努氏硬度", font=_F["bold11"]);   _cell(ws, "N7", "522kg/mm\u00b2", font=_F["b10"])
-    _cell(ws, "O6", "FA磨耗度", font=_F["bold11"]);     _cell(ws, "O7", "50", font=_F["b10"])
+    _cell(ws, "N6", "HK努氏硬度", font=_F["bold11"]);   _cell(ws, "N7", "522kg/mm\u00b2", font=_F["bold10"])
+    _cell(ws, "O6", "FA磨耗度", font=_F["bold11"]);     _cell(ws, "O7", "50", font=_F["bold10"])
     ws.row_dimensions[7].height = 28
     ws.merge_cells("D4:D5"); ws.merge_cells("E4:E5"); ws.merge_cells("L4:M4"); ws.merge_cells("L5:M5")
 
@@ -199,12 +202,24 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
     ws.merge_cells("A8:O8"); ws.row_dimensions[8].height = 24
     _cell(ws, "A9", "球面透镜加工工艺卡", font=_F["sec"], fill=_FL["orange"])
     ws.merge_cells("A9:C9"); ws.row_dimensions[9].height = 22
+    _cell(ws, "J9", "版次", font=_F["bold11"])
+    _cell(ws, "K9", "A", font=_F["bold11"])
+    _cell(ws, "L9", "页次", font=_F["bold11"])
+    _cell(ws, "M9", "1/1", font=_F["bold11"])
+    _cell(ws, "N9", "工序名称", font=_F["bold11"])
+    _cell(ws, "O9", "总流程", font=_F["bold11"])
     _cell(ws, "A10", "产品类型", font=_F["bold11"], fill=_FL["orange"])
     _cell(ws, "B10", "图号", font=_F["bold11"], fill=_FL["orange"])
     _cell(ws, "C10", "工艺卡号", font=_F["bold11"], fill=_FL["orange"])
+    _cell(ws, "J10", "制定", font=_F["bold11"])
+    _cell(ws, "J11", "审核", font=_F["bold11"])
+    _cell(ws, "K10", p.author, font=_F["11"]); ws.merge_cells("K10:L10")
+    _cell(ws, "K11", p.reviewer, font=_F["11"]); ws.merge_cells("K11:L11")
+    _cell(ws, "N10", p.approver, font=_F["11"]); ws.merge_cells("N10:O11")
     _cell(ws, "A11", p.lens_type, font=_F["bold11"], fill=_FL["orange"])
     _cell(ws, "B11", p.drawing_no, font=_F["bold11"], fill=_FL["orange"])
     _cell(ws, "C11", p.card_no, font=_F["bold11"], fill=_FL["orange"])
+    
     ws.row_dimensions[10].height = ws.row_dimensions[11].height = 22
 
     # ── 行12: 工序表头 (A-E 蓝灰 / F-J 浅绿 / K-M 淡蓝灰) ──
@@ -236,7 +251,7 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
             _cell(ws, f"B{row}", bay if i == 0 else "", font=_F["bold11"], fill=fill)
             _cell(ws, f"C{row}", proc if i == 0 else "", font=_F["bold11"], fill=fill)
             _cell(ws, f"D{row}", obj if i == 0 else "", font=_F["bold11"], fill=fill)
-            _cell(ws, f"E{row}", req, font=_F["p"], align=_ALIGN_C)
+            _cell(ws, f"E{row}", req, font=_F["11"], align=_ALIGN_C)
             for c in range(6, 14): _cell(ws, f"{_cl(c)}{row}", "", font=_F["bold11"])
             ws.row_dimensions[row].height = max(20, 14 * max(1, len(req) // 40))
             row += 1
@@ -267,11 +282,11 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
     # ft+2: 数据行
     _cell(ws, f"A{ft+2}", "A",          font=_F["bold11"])
     _cell(ws, f"B{ft+2}", "新增",       font=_F["bold11"])
-    _cell(ws, f"J{ft+2}", p.author,    font=_F["bold11"])
-    _cell(ws, f"K{ft+2}", p.reviewer,  font=_F["bold11"])
-    _cell(ws, f"L{ft+2}", p.approver,  font=_F["bold11"])
+    _cell(ws, f"J{ft+2}", p.author,    font=_F["11"])
+    _cell(ws, f"K{ft+2}", p.reviewer,  font=_F["11"])
+    _cell(ws, f"L{ft+2}", p.approver,  font=_F["11"])
     today = datetime.date.today()
-    _cell(ws, f"M{ft+2}", f"{today.year}.{today.month}.{today.day}",  font=_F["bold11"])
+    _cell(ws, f"M{ft+2}", f"{today.year}.{today.month}.{today.day}",  font=_F["11"])
     ws.merge_cells(start_row=ft+2, start_column=2, end_row=ft+2, end_column=9)
     ws.merge_cells(start_row=ft+2, start_column=13, end_row=ft+2, end_column=15)
     ws.row_dimensions[ft+2].height = 22

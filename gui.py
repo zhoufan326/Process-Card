@@ -404,14 +404,15 @@ class TaskApp:
     @classmethod
     def _invalidate_ctx_cache(cls):
         cls._ctx_cache = None
+        import lens_calc  # ensure module is loaded
         import importlib, sys
-        importlib.reload(sys.modules["process_planning"])
+        importlib.reload(sys.modules["lens_calc"])
 
     @classmethod
     def _resolve_placeholders(cls, req: str) -> str:
         """将 ${xxx} 占位符替换为 field_schema.json 默认值。"""
         import json
-        from process_planning import LensParams, calculate
+        from lens_calc import LensParams, calculate
 
         if cls._ctx_cache is None:
             p = LensParams()
@@ -638,6 +639,8 @@ class TaskApp:
             messagebox.showwarning("文件被占用",
                                    "导出失败，文件正在被 Excel 或其他程序打开。\n请先关闭文件再重试。")
         except Exception as e:
+            import traceback
+            traceback.print_exc()   # ← 加这一行，会在终端打印完整堆栈
             messagebox.showerror("导出失败", str(e))
 
     def _on_process_calc(self):

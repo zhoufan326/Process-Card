@@ -1,17 +1,26 @@
-r"""工艺方案设计 — 球面透镜参数计算。
+r"""球面透镜工艺计算 — GUI 界面。
 
-根据透镜物理参数和加工参数，自动计算焦距、后焦距、
-偏心差、面倾斜、曲率半径公差范围、矢高、下料尺寸等工艺指标。
-
-字段定义由 field_schema.json 统一管理。
+由 field_schema.json 驱动生成输入面板，
+计算核心委托给 lens_calc.py。
 """
 
+import io
 import json
-import math
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
-from dataclasses import dataclass, make_dataclass, field
+
+try:
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    _HAS_MPL = True
+except ImportError:
+    _HAS_MPL = False
+
+from lens_calc import (
+    LensParams, CalcResult, calculate, SCHEMA,
+    _sag, _FRINGE_CONST,
+)
 
 # ═══ 配色 (共享 gui.py 中式古典风格) ═══
 CLR_PAPER    = "#F5F0E8"
@@ -24,264 +33,6 @@ CLR_ACCENT   = "#8D6E63"
 CLR_ACCENT_HI = "#6D4C41"
 FONT = "Microsoft YaHei"
 
-# ═══ 加载字段 Schema ═══
-
-def _load_schema() -> dict:
-    schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
-    with open(schema_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-SCHEMA = _load_schema()
-
-# ═══ 光学/工艺经验常数 ═══
-# 以下常数来源于《工艺方案设计-王千奥.xlsx》中的工程经验值
-_SAMPLE_PRECISION_THRESHOLD = 35.0   # R值分界点 (mm), <此值用μm, ≥用%
-_TILT_CONST = 0.291                  # 偏心→面倾斜换算系数 (源于工艺经验)
-_SPHERE_CENTER_CONST = 3438          # 角分→弧度换算 (弧分到弧度的简化: 3438 ≈ 180*60/π)
-_FRINGE_CONST = 2.0                  # 反射式牛顿环：OPD=2×Δs → 每道光圈 Δs=λ/2
-
-
-# ═══ 数据结构 ═══
-
-_TYPE_PY = {"str": str, "float": float, "int": int}
-
-
-def _flatten_fields():
-    """将 gui_sections 展平为 (attr, type, default) 序列。"""
-    for section in SCHEMA["gui_sections"]:
-        for f in section["fields"]:
-            if "attr" in f:
-                yield f["attr"], _TYPE_PY[f["type"]], f.get("default")
-
-
-def _make_lens_params():
-    """由 field_schema.json 动态构建 LensParams dataclass。
-    
-    新增输入字段只需在 field_schema.json 中配置, 无需修改 Python 代码。
-    """
-    return make_dataclass(
-        "LensParams",
-        [(name, typ, field(default=default)) for name, typ, default in _flatten_fields()],
-    )
-
-LensParams = _make_lens_params()
-
-
-@dataclass
-class CalcResult:
-    """所有计算结果。"""
-    focal_length: float = 0.0
-    back_focal_s1: float = 0.0
-    back_focal_s2: float = 0.0
-
-    blank_diameter: float = 0.0
-    blank_thickness: float = 0.0
-    s1_ca_strict: float = 0.0
-    s2_ca_strict: float = 0.0
-
-    tc_after_mill_s1: float = 0.0
-    tc_after_mill_s2: float = 0.0
-    tc_after_grinding_s1: float = 0.0
-    tc_after_grinding_s2: float = 0.0
-
-    # 精磨 / 抛光（由总量 grinding_polishing 拆分得出）
-    grinding_s1: float = 0.0
-    grinding_s2: float = 0.0
-    polishing_s1: float = 0.0
-    polishing_s2: float = 0.0
-
-    sag_s1: float = 0.0
-    sag_s2: float = 0.0
-    sag_diff_s1: float = 0.0
-    sag_diff_s2: float = 0.0
-    sag_max_s1: float = 0.0
-    sag_max_s2: float = 0.0
-    r_max_s1: float = 0.0
-    r_max_s2: float = 0.0
-
-    r1_sample_precision: float = 0.0
-    r2_sample_precision: float = 0.0
-    r1_dr_with_sample: float = 0.0
-    r1_dr_no_sample: float = 0.0
-    r1_upper: float = 0.0
-    r1_lower: float = 0.0
-    r2_dr_with_sample: float = 0.0
-    r2_dr_no_sample: float = 0.0
-    r2_upper: float = 0.0
-    r2_lower: float = 0.0
-    r1_actual_upper: str = ""
-    r1_actual_lower: str = ""
-    r2_actual_upper: str = ""
-    r2_actual_lower: str = ""
-
-    tilt_s1_per_mm: float = 0.0
-    tilt_s2_per_mm: float = 0.0
-    decent_s1_per_tilt: float = 0.0
-    decent_s2_per_tilt: float = 0.0
-    sphere_center_s1: float = 0.0
-    sphere_center_s2: float = 0.0
-    reflect_center_s1: float = 0.0
-    reflect_center_s2: float = 0.0
-    edge_thick_diff_s1: float = 0.0
-
-    tilt_from_center_s1: float = 0.0
-    tilt_from_center_s2: float = 0.0
-
-
-# ═══ 辅助函数 ═══
-
-def _safe_div(a: float, b: float) -> float:
-    try: return a / b
-    except (ZeroDivisionError, ValueError): return 0.0
-
-def _sag(r_val: float, dia: float) -> float:
-    ar = abs(r_val)
-    half = dia / 2.0
-    if half >= ar:
-        return ar
-    return ar - math.sqrt(ar ** 2 - half ** 2)
-
-def _r_from_sag(s: float, dia: float) -> float:
-    if s <= 0: return float('inf')
-    return (dia ** 2) / (8 * s) + s / 2
-
-def _sample_precision(rv: float) -> float:
-    ar = abs(rv)
-    if ar >= _SAMPLE_PRECISION_THRESHOLD:
-        return 0.01 if ar > 1000 else 0.02
-    if ar > 10: return 2.0
-    return 1.0 if ar > 5 else 0.5
-
-def _to_mm(precision: float, rv: float) -> float:
-    if abs(rv) < _SAMPLE_PRECISION_THRESHOLD:
-        return precision / 1000.0
-    return precision / 100.0 * abs(rv)
-
-
-# ═══ 核心计算 ═══
-
-def calculate(p: LensParams) -> CalcResult:
-    r = CalcResult()
-
-    # ── 焦距 (透镜制造者公式) ──
-    # 1/f = (n-1)*(1/R1 - 1/R2) + (n-1)^2 * Tc / (n * R1 * R2)
-    term1 = (p.n - 1) * (1.0 / p.r1 - 1.0 / p.r2)
-    term2 = (p.n - 1) ** 2 * p.tc / (p.n * p.r1 * p.r2)
-    focal = 1.0 / (term1 + term2)
-    r.focal_length = round(focal, 4)
-
-    # ── 后焦距 ──
-    # BFL = f * (1 - Tc*(n-1)/(n*R))
-    bfl_s1 = focal * (1 - p.tc * (p.n - 1) / (p.n * p.r1))
-    bfl_s2 = focal * (1 - p.tc * (p.n - 1) / (p.n * p.r2))
-    r.back_focal_s1 = round(bfl_s1, 2)
-    r.back_focal_s2 = round(bfl_s2, 2)
-
-    # ── 下料尺寸 ──
-    r.blank_diameter = round(p.diameter + p.pre_edge, 1)
-    # 下料中心厚度 = Tc + 铣磨S1 + 铣磨S2 + 精磨抛光S1 + 精磨抛光S2
-    raw_thick = p.tc + p.mill_s1 + p.mill_s2 + p.grinding_polishing_s1 + p.grinding_polishing_s2
-    r.blank_thickness = round(raw_thick, 2)
-
-    # ── 加严 CA（检测口径按毛坯比例放大）──
-    # 加严 CA = 原 CA × 毛坯外径 / 成品外径
-    # 例如：CA=44, blank_D=50, D=48 → 加严 CA=45.8
-    r.s1_ca_strict = round(p.s1_ca * r.blank_diameter / p.diameter, 1)
-    r.s2_ca_strict = round(p.s2_ca * r.blank_diameter / p.diameter, 1)
-
-    # ── 精磨量 / 抛光量拆分 ──
-    # polishing 固定为 0.02mm，grinding = grinding_polishing - polishing
-    r.polishing_s1 = 0.02
-    r.polishing_s2 = 0.02
-    r.grinding_s1  = round(p.grinding_polishing_s1 - r.polishing_s1, 2)
-    r.grinding_s2  = round(p.grinding_polishing_s2 - r.polishing_s2, 2)
-
-    # ── 工序厚度 (逐层扣除) ──
-    r.tc_after_mill_s1         = round(raw_thick - p.mill_s1, 2)                          # 铣磨S1后
-    r.tc_after_mill_s2         = round(r.tc_after_mill_s1 - p.mill_s2, 2)                 # 铣磨S2后
-    r.tc_after_grinding_s1     = round(r.tc_after_mill_s2 - p.grinding_polishing_s1, 2)   # 抛光S1后（S2待抛）
-    r.tc_after_grinding_s2     = round(r.tc_after_grinding_s1 - p.grinding_polishing_s2, 2)  # 抛光S2后 = 原始Tc（校验）
-
-    # ── 矢高 ──
-    # 自动限制 CA ≤ 外径 (避免物理上不存在的区域计算崩溃)
-    ca1 = min(p.s1_ca, p.diameter)
-    ca2 = min(p.s2_ca, p.diameter)
-    r.sag_s1 = round(_sag(p.r1, ca1), 6)
-    r.sag_s2 = round(_sag(p.r2, ca2), 6)
-
-    # 矢高差 = N × λ/2 (反射式牛顿环: OPD=2×Δs → 每道光圈 Δs=λ/2, 单位mm)
-    sag_per_fringe = p.wavelength * 1e-6 / _FRINGE_CONST
-    r.sag_diff_s1 = round(p.s1_n * sag_per_fringe, 6)
-    r.sag_diff_s2 = round(p.s2_n * sag_per_fringe, 6)
-    r.sag_max_s1 = round(r.sag_s1 + r.sag_diff_s1, 6)
-    r.sag_max_s2 = round(r.sag_s2 + r.sag_diff_s2, 6)
-
-    # R最大值 (由最大矢高反推)
-    r.r_max_s1 = round(_r_from_sag(r.sag_max_s1, ca1), 4)
-    r.r_max_s2 = round(_r_from_sag(r.sag_max_s2, ca2), 4)
-
-    # ── 曲率半径公差 ──
-    r.r1_sample_precision = _sample_precision(p.r1)
-    r.r2_sample_precision = _sample_precision(p.r2)
-
-    precision_r1 = _to_mm(r.r1_sample_precision, p.r1)
-    precision_r2 = _to_mm(r.r2_sample_precision, p.r2)
-
-    # ΔR (含样板公差) = |R_max - R| + 样板精度
-    r.r1_dr_with_sample = round(abs(abs(r.r_max_s1) - abs(p.r1)) + precision_r1, 4)
-    r.r2_dr_with_sample = round(abs(abs(r.r_max_s2) - abs(p.r2)) + precision_r2, 4)
-    # ΔR (不含样板公差)
-    r.r1_dr_no_sample = round(abs(abs(r.r_max_s1) - abs(p.r1)), 4)
-    r.r2_dr_no_sample = round(abs(abs(r.r_max_s2) - abs(p.r2)), 4)
-
-    # R值上/下限
-    # 注意: 使用不含样板公差的 ΔR（样板精度 ε 是检测工具误差，非零件本身偏差）
-    r.r1_upper = round(p.r1 + r.r1_dr_no_sample, 4)
-    r.r1_lower = round(p.r1 - r.r1_dr_no_sample, 4)
-    r.r2_upper = round(p.r2 + r.r2_dr_no_sample, 4)
-    r.r2_lower = round(p.r2 - r.r2_dr_no_sample, 4)
-
-    # 实际上下限文字
-    for side in ('r1', 'r2'):
-        rv = getattr(p, side)
-        prec = getattr(r, f'{side}_sample_precision')
-        if abs(rv) < _SAMPLE_PRECISION_THRESHOLD:
-            text = f"{prec}\u00b5m"
-            setattr(r, f'{side}_actual_upper', text)
-            setattr(r, f'{side}_actual_lower', text)
-        else:
-            setattr(r, f'{side}_actual_upper', f"{getattr(r, f'{side}_upper'):.4f}")
-            setattr(r, f'{side}_actual_lower', f"{getattr(r, f'{side}_lower'):.4f}")
-
-    # ── 偏心 / 面倾斜 (使用工艺经验系数 _TILT_CONST ≈ 0.291) ──
-    # 标准光学关系: 偏心 δ = (n-1) * BFL * θ
-    # 此处 _TILT_CONST 为工艺经验校正值，非标准光学常数
-    # 面倾斜X(') = |c/(0.291*(n-1)*BFL)| * 1000  (c=偏心差 mm)
-    c_ref = 0.008  # 参考偏心差 0.008mm
-    r.tilt_s1_per_mm = round(abs(_safe_div(c_ref, _TILT_CONST * (p.n - 1) * bfl_s1)) * 1000, 2)
-    r.tilt_s2_per_mm = round(abs(_safe_div(c_ref, _TILT_CONST * (p.n - 1) * bfl_s2)) * 1000, 2)
-
-    # 偏心差 c(mm) = X * 0.291 * (n-1) * BFL / 1000  (X=面倾斜 1')
-    r.decent_s1_per_tilt = round(_TILT_CONST * (p.n - 1) * bfl_s1 / 1000, 5)
-    r.decent_s2_per_tilt = round(_TILT_CONST * (p.n - 1) * bfl_s2 / 1000, 5)
-
-    # 球心距 a(mm) = X * R / 3438
-    r.sphere_center_s1 = round(p.r1 / _SPHERE_CENTER_CONST, 4)
-    r.sphere_center_s2 = round(p.r2 / _SPHERE_CENTER_CONST, 4)
-
-    # 反射球心距 (用于镜面检测转换)
-    r.reflect_center_s1 = round(p.r1 * 0.004 / (p.r2 - p.r1), 6)
-    r.reflect_center_s2 = round(p.r2 * 0.0025 / (p.r2 - p.r1), 6)
-
-    # 反射球心距转化面倾斜
-    r.tilt_from_center_s1 = round(_safe_div(_SPHERE_CENTER_CONST * 0.02, p.r1), 2)
-    r.tilt_from_center_s2 = round(_safe_div(_SPHERE_CENTER_CONST * 0.02, p.r2), 2)
-
-    # 边厚差 Δt = c * D / ((n-1) * BFL)
-    r.edge_thick_diff_s1 = round(_safe_div(0.004 * p.diameter, (p.n - 1) * bfl_s1), 4)
-
-    return r
-
 
 # ═══ GUI ═══
 
@@ -291,6 +42,7 @@ class ProcessPlanApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self._params = LensParams()
+        self._last_result = None
         self._build_ui()
         self._on_calculate()
 
@@ -352,6 +104,11 @@ class ProcessPlanApp:
                   relief="flat", cursor="hand2", bd=0,
                   activebackground=CLR_ACCENT_HI, activeforeground="white",
                   width=12).pack(side="left", padx=4, pady=4)
+        tk.Button(bf, text="展示计算过程", command=self._show_calculation_process,
+                  font=(FONT, 10), bg="#A1887F", fg="white",
+                  relief="flat", cursor="hand2", bd=0,
+                  activebackground=CLR_ACCENT_HI, activeforeground="white",
+                  width=14).pack(side="left", padx=4, pady=4)
         self._status = tk.StringVar(value="就绪 — 请输入参数后点击「开始计算」")
         tk.Label(bf, textvariable=self._status, font=(FONT, 9),
                  fg=CLR_SUBTEXT, bg=CLR_HEADER, anchor="e").pack(side="right", padx=14, pady=4)
@@ -363,26 +120,12 @@ class ProcessPlanApp:
     # ═══════════════════════════════════════════════
 
     def _build_input_fields(self, panel):
-        """由 field_schema.json 驱动，自动生成全部输入控件。
-
-        步骤拆解：
-          1. 读取 LensParams 默认值（由 schema 动态构建的 dataclass）
-          2. 遍历 SCHEMA["gui_sections"]，对每个 section 画标题 + 渲染字段
-          3. 每个字段渲染为 [Label | Entry( + Unit)] 一行
-        """
+        """由 field_schema.json 驱动，自动生成全部输入控件。"""
         self._entries = {}
         _DEFAULTS = LensParams()
 
-        # ── 关于 _row = [0] ──
-        # 为什么用列表而不是普通 int？
-        # 因为 Python 闭包（nested function）只能「读」外层不可变变量，
-        # 不能直接「修改」外层 int。列表是可变对象，_row[0] += 1 修改的是
-        # 列表内容而非变量绑定，闭包可以捕获并修改。
-        # 等效替代：用 nonlocal row；或直接用实例属性 self._row。
         _row = [0]
 
-        # ── 1. 渲染 Section 标题 ──
-        # 利用闭包捕获 panel、_row，减少重复传参
         def _section(title):
             tk.Label(panel, text=title, font=(FONT, 10, "bold"),
                      fg=CLR_ACCENT, bg=CLR_PANEL, anchor="w").grid(
@@ -390,24 +133,27 @@ class ProcessPlanApp:
                          sticky="ew", padx=14, pady=(10, 2))
             _row[0] += 1
 
-        # ── 2. 渲染单个字段行 ──
-        # 布局：左侧标签(右对齐) | 右侧[输入框 + 可选单位标签]
         def _add_field(attr, label, unit=""):
             default = str(getattr(_DEFAULTS, attr))
 
-            # 2a. 标签列（列0） — 右对齐，固定宽度 18 字符
             tk.Label(panel, text=label, font=(FONT, 9), fg=CLR_SUBTEXT,
                      bg=CLR_PANEL, anchor="e", width=18).grid(
                          row=_row[0], column=0, padx=(14, 4), pady=2, sticky="e")
 
-            # 2b. 输入列（列1） — Entry + 可选单位
             frm = tk.Frame(panel, bg=CLR_PANEL)
             frm.grid(row=_row[0], column=1, sticky="ew", padx=(0, 14), pady=2)
 
-            ent = tk.Entry(frm, font=(FONT, 9), width=18, bg="white",
-                           fg=CLR_TEXT, relief="solid", bd=1)
-            ent.pack(side="left")
-            ent.insert(0, default)
+            if attr == "coating_spec":
+                ent = tk.Text(frm, font=(FONT, 9), width=30, height=4,
+                              bg="white", fg=CLR_TEXT, relief="solid", bd=1,
+                              wrap="word", insertbackground=CLR_ACCENT)
+                ent.pack(fill="x")
+                ent.insert("1.0", default)
+            else:
+                ent = tk.Entry(frm, font=(FONT, 9), width=18, bg="white",
+                               fg=CLR_TEXT, relief="solid", bd=1)
+                ent.pack(side="left")
+                ent.insert(0, default)
 
             if unit:
                 tk.Label(frm, text=unit, font=(FONT, 8), fg=CLR_SUBTEXT,
@@ -416,10 +162,6 @@ class ProcessPlanApp:
             self._entries[attr] = ent
             _row[0] += 1
 
-        # ── 3. Schema 驱动循环 ──
-        # 遍历 SCHEMA["gui_sections"]，对每个 section：
-        #   先画 section 标题，再渲染该 section 下的所有字段
-        # 注意：schema 中可以包含 _comment 标记条目（不含 attr），需跳过
         for section in SCHEMA["gui_sections"]:
             _section(section["title"])
             for f in section["fields"]:
@@ -429,29 +171,14 @@ class ProcessPlanApp:
 
     # ═══════════════════════════════════════════════
     #  应用按钮 → Read-Modify-Write 模式
-    #  将当前 GUI 输入值写回 field_schema.json 的 default 字段
-    #  使得下次启动或主窗口同步时使用最新值
     # ═══════════════════════════════════════════════
 
     def _on_apply(self):
-        """将当前所有输入值持久化到 field_schema.json 的 default 字段。
-
-        流程（经典 Read-Modify-Write 模式）：
-          Step 1 — Read:   读取 field_schema.json → schema 字典
-          Step 2 — Modify: 遍历 gui_sections，用 Entry 内容覆盖 default
-          Step 3 — Write:  将修改后的 schema 写回 JSON 文件
-
-        类型处理：
-          schema 中每个字段有 "type" 标记（float / int / str），
-          写入时做类型转换，确保 JSON 输出正确的数据类型（而非全部存成字符串）。
-        """
+        """将当前所有输入值持久化到 field_schema.json 的 default 字段。"""
         schema_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "field_schema.json")
 
-        # ── Step 1: Read ──
-        # 注意：每次都重新从磁盘读取，而非使用模块级的 SCHEMA 常量
-        # 原因：_on_calculate 可能已修改 SCHEMA，重新读取确保拿到最新磁盘内容
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
                 schema = json.load(f)
@@ -459,16 +186,15 @@ class ProcessPlanApp:
             messagebox.showerror("错误", f"无法读取 field_schema.json\n路径: {schema_path}\n原因: {e}")
             return
 
-        # ── Step 2: Modify ──
-        # 类型感知的 default 值更新：
-        #   str   → 直接存（如材料名 "Corning 7980"）
-        #   float → float(raw)，空字符串回退 0.0
-        #   int   → int(raw)，空字符串回退 0
         for section in schema.get("gui_sections", []):
             for f in section.get("fields", []):
                 if "attr" not in f or f["attr"] not in self._entries:
                     continue
-                raw = self._entries[f["attr"]].get().strip()
+                widget = self._entries[f["attr"]]
+                if isinstance(widget, tk.Text):
+                    raw = widget.get("1.0", "end-1c").strip()
+                else:
+                    raw = widget.get().strip()
                 if f["type"] == "float":
                     f["default"] = float(raw) if raw else 0.0
                 elif f["type"] == "int":
@@ -476,9 +202,6 @@ class ProcessPlanApp:
                 else:
                     f["default"] = raw
 
-        # ── Step 3: Write（带重试） ──
-        # VS Code 打开 field_schema.json 时会持有写锁，导致写入失败。
-        # 最多重试 3 次，每次间隔 0.5s，等待锁释放。
         import time
         success = False
         for attempt in range(3):
@@ -508,13 +231,7 @@ class ProcessPlanApp:
     # ── 校验 & 计算 ──
 
     def _validate(self, e: dict) -> str | None:
-        """输入校验，返回错误信息或 None。
-        校验规则:
-          - R1/R2 不得为零
-          - 折射率 n ≥ 1.0
-          - Tc > 0
-          - CA ≤ 外径 D (避免物理不存在的检测区域)
-        """
+        """输入校验，返回错误信息或 None。"""
         try:
             r1 = float(e["r1"].get())
             r2 = float(e["r2"].get())
@@ -546,14 +263,17 @@ class ProcessPlanApp:
                 messagebox.showerror("输入错误", err)
                 return
 
-            # 由 field_schema.json 驱动构造 LensParams (JSON type→Python 类型映射)
             _TYPE_MAP = {"str": str, "float": float, "int": int}
             kwargs = {}
             for section in SCHEMA["gui_sections"]:
                 for f in section["fields"]:
-                    if "attr" not in f:     # 跳过 _comment 条目
+                    if "attr" not in f:
                         continue
-                    raw = e[f["attr"]].get().strip()
+                    widget = e[f["attr"]]
+                    if isinstance(widget, tk.Text):
+                        raw = widget.get("1.0", "end-1c").strip()
+                    else:
+                        raw = widget.get().strip()
                     converter = _TYPE_MAP.get(f["type"], str)
                     kwargs[f["attr"]] = converter(raw)
             self._params = LensParams(**kwargs)
@@ -563,6 +283,7 @@ class ProcessPlanApp:
             return
 
         result = calculate(self._params)
+        self._last_result = result
         self._display_result(result)
         self._status.set(f"计算完成 — 焦距={result.focal_length}mm")
 
@@ -631,6 +352,188 @@ class ProcessPlanApp:
         _l("S2 面倾斜X", f"{r.tilt_from_center_s2:.2f}", "'")
 
         t.configure(state="disabled")
+
+    def _show_calculation_process(self):
+        """打开新窗口，用 matplotlib 渲染 LaTeX 展示全部计算过程。"""
+        if not _HAS_MPL:
+            messagebox.showerror("错误",
+                "需要 matplotlib 来渲染公式。\n请运行：pip install matplotlib")
+            return
+
+        import matplotlib
+        matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+        matplotlib.rcParams['axes.unicode_minus'] = False
+
+        p = self._params
+        r = self._last_result
+        if r is None:
+            messagebox.showinfo("提示", "请先点击「开始计算」。")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("计算过程详细推导")
+        win.geometry("860x720")
+        win.configure(bg=CLR_PAPER)
+
+        canvas = tk.Canvas(win, bg=CLR_PAPER, highlightthickness=0)
+        sb = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        panel = tk.Frame(canvas, bg=CLR_PAPER)
+        panel.bind("<Configure>",
+                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=panel, anchor="nw")
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+
+        def _on_mousewheel(event):
+            try:
+                canvas.yview_scroll(int(-event.delta / 120), "units")
+            except tk.TclError:
+                pass
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+        panel.bind("<MouseWheel>", _on_mousewheel)
+
+        def _step(title, formula, result_text, note=""):
+            frm = tk.Frame(panel, bg=CLR_PANEL,
+                           highlightbackground=CLR_BORDER, highlightthickness=1)
+            frm.pack(fill="x", padx=12, pady=6)
+
+            tk.Label(frm, text=title, font=(FONT, 11, "bold"),
+                     fg=CLR_ACCENT, bg=CLR_PANEL, anchor="w"
+                     ).pack(fill="x", padx=12, pady=(8, 2))
+
+            if note:
+                tk.Label(frm, text=note, font=(FONT, 9, "italic"),
+                         fg=CLR_SUBTEXT, bg=CLR_PANEL, anchor="w",
+                         justify="left"
+                         ).pack(fill="x", padx=12, pady=(0, 2))
+
+            fig = Figure(figsize=(7.5, 0.45), dpi=120)
+            fig.patch.set_alpha(0)
+            fig.text(0.5, 0.5, f"${formula}$", fontsize=13,
+                     ha="center", va="center")
+            mpl_canvas = FigureCanvasTkAgg(fig, master=frm)
+            mpl_canvas.draw()
+            mpl_canvas.get_tk_widget().pack(fill="x", padx=12, pady=4)
+
+            tk.Label(frm, text=result_text, font=(FONT, 9),
+                     fg=CLR_TEXT, bg=CLR_PANEL, anchor="w",
+                     justify="left", wraplength=800
+                     ).pack(fill="x", padx=12, pady=(0, 8))
+
+        # ═══════════════════════════════════════
+        #  各步骤
+        # ═══════════════════════════════════════
+
+        ca1 = min(p.s1_ca, p.diameter)
+        ca2 = min(p.s2_ca, p.diameter)
+
+        term1 = (p.n - 1) * (1.0 / p.r1 - 1.0 / (-p.r2))
+        term2 = (p.n - 1) ** 2 * p.tc / (p.n * p.r1 * (-p.r2))
+        _step(
+            "1. 焦距计算（透镜制造者公式）",
+            r"\frac{1}{f} = (n-1)\left(\frac{1}{R_1} - \frac{1}{R_2}\right)"
+            r" + \frac{(n-1)^2 T_c}{n R_1 (-R_2)}",
+            f"代入值:  n={p.n},  R₁={p.r1} mm,  R₂={p.r2} mm,  Tc={p.tc} mm\n"
+            f"  term₁ = ({p.n}-1)×(1/{p.r1} − 1/{-p.r2}) = {term1:.6f}\n"
+            f"  term₂ = ({p.n}-1)²×{p.tc} / ({p.n}×{p.r1}×{-p.r2}) = {term2:.10f}\n"
+            f"  焦距 f = 1 / ({term1:.6f} + {term2:.10f}) = {r.focal_length:.4f} mm"
+        )
+
+        bfl1_arg = p.tc * (p.n - 1) / (p.n * p.r1)
+        bfl2_arg = p.tc * (p.n - 1) / (p.n * (-p.r2))
+        _step(
+            "2. 后焦距 BFL",
+            r"\text{BFL}_{S1} = f\left(1 - \frac{T_c (n-1)}{n R_1}\right)\qquad"
+            r"\text{BFL}_{S2} = f\left(1 - \frac{T_c (n-1)}{n (-R_2)}\right)",
+            f"  BFL_S1 = {r.focal_length:.4f} × (1 − {bfl1_arg:.6f}) = {r.back_focal_s1:.2f} mm\n"
+            f"  BFL_S2 = {r.focal_length:.4f} × (1 − {bfl2_arg:.6f}) = {r.back_focal_s2:.2f} mm"
+        )
+
+        sag1 = _sag(p.r1, ca1)
+        sag2 = _sag(p.r2, ca2)
+        _step(
+            "3. 矢高计算",
+            r"s = |R| - \sqrt{R^2 - \left(\frac{CA}{2}\right)^2}",
+            f"  S1:  |R₁|={abs(p.r1):.4f},  CA/2={ca1/2:.1f}  →  s₁ = {sag1:.6f} mm\n"
+            f"  S2:  |R₂|={abs(p.r2):.4f},  CA/2={ca2/2:.1f}  →  s₂ = {sag2:.6f} mm"
+        )
+
+        sag_per_fringe = p.wavelength * 1e-6 / _FRINGE_CONST
+        _step(
+            "4. 矢高差（牛顿环 · 反射式）",
+            r"\Delta s = N \times \frac{\lambda}{2} \qquad"
+            r"(\text{OPD}=2\Delta s,\; \Delta s=\lambda/2)",
+            f"  λ = {p.wavelength} nm = {p.wavelength*1e-6:.6f} mm\n"
+            f"  Δs/圈 = λ/2 = {sag_per_fringe:.6f} mm\n"
+            f"  S1:  N={p.s1_n}  →  Δs₁ = {r.sag_diff_s1:.6f} mm\n"
+            f"  S2:  N={p.s2_n}  →  Δs₂ = {r.sag_diff_s2:.6f} mm",
+            note="反射式牛顿环: OPD=2×Δs, 每道光圈 Δs=λ/2",
+        )
+
+        _step(
+            "5. 最大矢高与曲率半径反推",
+            r"s_{\max} = s + \Delta s \qquad"
+            r"R_{\max} = \frac{CA^2}{8\,s_{\max}} + \frac{s_{\max}}{2}",
+            f"  S1:  s_max₁ = {r.sag_s1:.6f} + {r.sag_diff_s1:.6f} = {r.sag_max_s1:.6f} mm\n"
+            f"       R_max₁ = {ca1}²/(8×{r.sag_max_s1:.6f}) + {r.sag_max_s1:.6f}/2"
+            f" = {r.r_max_s1:.4f} mm\n"
+            f"  S2:  s_max₂ = {r.sag_s2:.6f} + {r.sag_diff_s2:.6f} = {r.sag_max_s2:.6f} mm\n"
+            f"       R_max₂ = {ca2}²/(8×{r.sag_max_s2:.6f}) + {r.sag_max_s2:.6f}/2"
+            f" = {r.r_max_s2:.4f} mm"
+        )
+
+        _step(
+            "6. 曲率半径公差 ΔR",
+            r"\Delta R = |\,|R_{\max}| - |R|\,|\qquad"
+            r"R_{\text{upper}} = R + \Delta R\qquad"
+            r"R_{\text{lower}} = R - \Delta R",
+            f"  R₁:  ΔR = |{r.r_max_s1} − {abs(p.r1)}| = {r.r1_dr_no_sample:.4f} mm\n"
+            f"       上限 = {p.r1} + {r.r1_dr_no_sample:.4f} = {r.r1_upper:.4f} mm\n"
+            f"       下限 = {p.r1} − {r.r1_dr_no_sample:.4f} = {r.r1_lower:.4f} mm\n"
+            f"  R₂:  ΔR = {r.r2_dr_no_sample:.4f} mm\n"
+            f"       上限 = {p.r2} + {r.r2_dr_no_sample:.4f} = {r.r2_upper:.4f} mm\n"
+            f"       下限 = {p.r2} − {r.r2_dr_no_sample:.4f} = {r.r2_lower:.4f} mm"
+        )
+
+        _step(
+            "7. 毛坯下料尺寸",
+            r"D_{\text{blank}} = D + \text{pre\_edge}\qquad"
+            r"T_{\text{blank}} = T_c + \text{mill}_{S1} + \text{mill}_{S2}"
+            r" + \text{grind/polish}_{S1} + \text{grind/polish}_{S2}",
+            f"  毛坯口径 = {p.diameter} + {p.pre_edge} = {r.blank_diameter:.1f} mm\n"
+            f"  毛坯厚度 = {p.tc} + {p.mill_s1} + {p.mill_s2}"
+            f" + {p.grinding_polishing_s1} + {p.grinding_polishing_s2}"
+            f" = {r.blank_thickness:.2f} mm"
+        )
+
+        _step(
+            "8. 面倾斜与偏心换算",
+            r"X\;({}') = \frac{c}{0.291\,(n-1)\,\text{BFL}} \times 1000"
+            r"\qquad c = X \times 0.291 \times (n-1) \times \frac{\text{BFL}}{1000}",
+            f"  参考偏心差 c = 0.008 mm\n"
+            f"  S1:  面倾斜@0.008mm = 0.008/(0.291×{p.n-1}×{r.back_focal_s1:.2f})×1000"
+            f" = {r.tilt_s1_per_mm:.2f}'\n"
+            f"  S2:  面倾斜@0.008mm = 0.008/(0.291×{p.n-1}×{r.back_focal_s2:.2f})×1000"
+            f" = {r.tilt_s2_per_mm:.2f}'"
+        )
+
+        _step(
+            "9. 球心距（面倾斜 → 球心偏移）",
+            r"a = \frac{X \times R}{3438}",
+            f"  S1:  a = 1′ × {p.r1} / 3438 = {r.sphere_center_s1:.4f} mm\n"
+            f"  S2:  a = 1′ × {p.r2} / 3438 = {r.sphere_center_s2:.4f} mm",
+            note="弧分→弧度换算: 3438 ≈ 180×60/π",
+        )
+
+        _step(
+            "10. 边厚差",
+            r"\Delta t_{\text{edge}} = \frac{D \times c}{R}",
+            f"  边厚差@0.004mm偏心 = {p.diameter}×0.004/{abs(p.r1):.4f}"
+            f" = {r.edge_thick_diff_s1:.4f} mm"
+        )
+
+        canvas.yview_moveto(0)
 
 
 if __name__ == "__main__":
