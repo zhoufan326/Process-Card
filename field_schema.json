@@ -308,6 +308,22 @@
           "type": "str",
           "default": "S1、S2：AR-193.368nm，R＜0.5%@193.368nm，AOI=0°±35°",
           "_comment": "镀膜规格要求"
+        },
+        {
+          "attr": "tilt_s1",
+          "label": "透射偏心 S1",
+          "unit": "′",
+          "type": "float",
+          "default": 30.0,
+          "_comment": "S1面透射偏心允许值（arcmin）"
+        },
+        {
+          "attr": "tilt_s2",
+          "label": "透射偏心 S2",
+          "unit": "′",
+          "type": "float",
+          "default": 30.0,
+          "_comment": "S2面透射偏心允许值（arcmin）"
         }
       ]
     }
@@ -371,7 +387,7 @@
       "source": "params",
       "attr": "s1_irr",
       "fmt": "s",
-      "prefix": "IRR：",
+      "prefix": "IRR：≤",
       "suffix": "λ",
       "hide_zero": true
     },
@@ -380,7 +396,7 @@
       "source": "params",
       "attr": "s2_irr",
       "fmt": "s",
-      "prefix": "IRR：",
+      "prefix": "IRR：≤",
       "suffix": "λ",
       "hide_zero": true
     },
@@ -389,7 +405,7 @@
       "source": "params",
       "attr": "s1_rms",
       "fmt": ".0f",
-      "prefix": "RMS：",
+      "prefix": "RMS：≤",
       "suffix": "nm",
       "hide_zero": true
     },
@@ -398,7 +414,7 @@
       "source": "params",
       "attr": "s2_rms",
       "fmt": ".0f",
-      "prefix": "RMS：",
+      "prefix": "RMS：≤",
       "suffix": "nm",
       "hide_zero": true
     },
@@ -607,14 +623,14 @@
     },
     {
       "ctx": "${tilt_s1}",
-      "source": "result",
-      "attr": "tilt_s1_per_mm",
+      "source": "params",
+      "attr": "tilt_s1",
       "fmt": ".1f"
     },
     {
       "ctx": "${tilt_s2}",
-      "source": "result",
-      "attr": "tilt_s2_per_mm",
+      "source": "params",
+      "attr": "tilt_s2",
       "fmt": ".1f"
     },
     {

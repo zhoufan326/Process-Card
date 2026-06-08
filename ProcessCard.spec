@@ -6,6 +6,7 @@ PyInstaller 打包配置 — Process Card (单文件模式)
 
 import os
 import sys
+import re
 
 # ── 项目路径 ──
 PROJ_DIR = os.path.abspath(".")
@@ -13,10 +14,21 @@ PROJ_DIR = os.path.abspath(".")
 def _p(name):
     return os.path.join(PROJ_DIR, name)
 
+# ── 从 installer.iss 读取版本号 ──
+def _get_version():
+    iss_path = _p("installer.iss")
+    if not os.path.isfile(iss_path):
+        return "0.0.0"
+    m = re.search(r'#define\s+MyAppVersion\s+"([^"]+)"', open(iss_path, encoding="utf-8").read())
+    return m.group(1) if m else "0.0.0"
+
+VERSION = _get_version()
+
 # ── 数据文件（会随 exe 一并分发） ──
 DATAS = [
     (_p("field_schema.json"), "."),
     (_p("manufacturing_process.json"), "."),
+    (_p("export_layout.json"), "."),
 ]
 
 # ── 隐藏导入 ──
@@ -71,7 +83,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="ProcessCard",
+    name=f"ProcessCard_v{VERSION}",
     debug=False,
     icon=_p("Optic_card.ico"),
     upx=True,

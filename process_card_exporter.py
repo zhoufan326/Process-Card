@@ -116,13 +116,20 @@ def _make_ctx(p, r):
                 if not val:
                     ctx[item["ctx"]] = ""
                     continue
-        text = str(val) if item["fmt"] == "s" else format(val, item["fmt"])
+        text = str(val) if item["fmt"] == "s" else _remove_trailing_zeros(format(val, item["fmt"]))
         if item.get("prefix"):
             text = item["prefix"] + text
         if item.get("suffix"):
             text += item["suffix"]
         ctx[item["ctx"]] = text
     return ctx
+
+
+def _remove_trailing_zeros(text: str) -> str:
+    """移除数值字符串末尾的零和小数点。如 '48.0' → '48', '14.890' → '14.89'。"""
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text
 
 
 def _resolve(val: str, ctx: dict) -> str:
@@ -220,8 +227,8 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
 
     # ── 动态单元格（需条件逻辑，不适合 JSON） ──
     # F4 / F5: R值 — R=0 时显示"平面"
-    _cell(ws, "F4", f"{p.r1:.3f}" if p.r1 else "平面", font=_STYLE_MAP["bold11"])
-    _cell(ws, "F5", f"{p.r2:.3f}" if p.r2 else "平面", font=_STYLE_MAP["bold11"])
+    _cell(ws, "F4", _remove_trailing_zeros(f"{p.r1:.3f}") if p.r1 else "平面", font=_STYLE_MAP["bold11"])
+    _cell(ws, "F5", _remove_trailing_zeros(f"{p.r2:.3f}") if p.r2 else "平面", font=_STYLE_MAP["bold11"])
     # J4 / J5: 面形 — 条件组合 IRR + RMS
     _cell(ws, "J4", _irr_rms_str(p.s1_irr, p.s1_rms), font=_STYLE_MAP["bold11"])
     _cell(ws, "J5", _irr_rms_str(p.s2_irr, p.s2_rms), font=_STYLE_MAP["bold11"])

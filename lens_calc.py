@@ -25,7 +25,7 @@ SCHEMA = _load_schema()
 # ═══ 光学/工艺经验常数 ═══
 # 以下常数来源于《工艺方案设计-王千奥.xlsx》中的工程经验值
 _SAMPLE_PRECISION_THRESHOLD = 35.0   # R值分界点 (mm), <此值用μm, ≥用%
-_TILT_CONST = 0.291                  # 偏心→面倾斜换算系数 (源于工艺经验)
+_TILT_CONST = 0.291                  # 偏心→面倾斜换算系数, π/(180×60)×1000 ≈ 0.2909
 _SPHERE_CENTER_CONST = 3438          # 角分→弧度换算 (弧分到弧度的简化: 3438 ≈ 180*60/π)
 _FRINGE_CONST = 2.0                  # 反射式牛顿环：OPD=2×Δs → 每道光圈 Δs=λ/2
 
@@ -252,15 +252,15 @@ def calculate(p: LensParams) -> CalcResult:
             setattr(r, f'{side}_actual_upper', f"{getattr(r, f'{side}_upper'):.4f}")
             setattr(r, f'{side}_actual_lower', f"{getattr(r, f'{side}_lower'):.4f}")
 
-    # ── 偏心 / 面倾斜 (使用工艺经验系数 _TILT_CONST ≈ 0.291) ──
-    # 标准光学关系: 偏心 δ = (n-1) * BFL * θ
-    # 此处 _TILT_CONST 为工艺经验校正值，非标准光学常数
-    # 面倾斜X(') = |c/(0.291*(n-1)*BFL)| * 1000  (c=偏心差 mm)
+    # ── 偏心 / 面倾斜 ──
+    # 面倾斜 X(') = |c / (k × (n-1) × BFL)| × 1000
+    #   其中 k = π/(180×60) ≈ 0.0002909 (arcmin→rad 换算), k×1000 ≈ 0.291
+    #   c = 参考偏心差 (mm)
     c_ref = 0.008  # 参考偏心差 0.008mm
     r.tilt_s1_per_mm = round(abs(_safe_div(c_ref, _TILT_CONST * (p.n - 1) * bfl_s1)) * 1000, 2)
     r.tilt_s2_per_mm = round(abs(_safe_div(c_ref, _TILT_CONST * (p.n - 1) * bfl_s2)) * 1000, 2)
 
-    # 偏心差 c(mm) = X * 0.291 * (n-1) * BFL / 1000  (X=面倾斜 1')
+    # 偏心差 c(mm) = X × k × (n-1) × BFL / 1000   (X=面倾斜 1', k = π/(180×60))
     r.decent_s1_per_tilt = round(_TILT_CONST * (p.n - 1) * bfl_s1 / 1000, 5)
     r.decent_s2_per_tilt = round(_TILT_CONST * (p.n - 1) * bfl_s2 / 1000, 5)
 

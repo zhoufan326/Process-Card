@@ -2,8 +2,8 @@
   "_comment": "工艺卡 Excel 静态布局定义。使用 ${xxx} 占位符引用 field_schema.json export_ctx 中的值。",
   "sheet_name": "工艺卡",
   "column_widths": {
-    "A": 12, "B": 20, "C": 12, "D": 16, "E": 50, "F": 14, "G": 10,
-    "H": 15, "I": 20, "J": 20, "K": 15, "L": 15, "M": 15, "N": 15, "O": 15, "P": 15
+    "A": 12, "B": 20, "C": 12, "D": 18, "E": 50, "F": 14, "G": 10,
+    "H": 15, "I": 22, "J": 20, "K": 15, "L": 15, "M": 15, "N": 15, "O": 15, "P": 15
   },
   "row_heights": {
     "1": 28, "2": 28, "3": 32, "4": 28, "5": 28, "6": 28, "7": 28,
@@ -79,6 +79,7 @@
     {"ref": "M9", "value": "1/1",           "style": "bold11"},
     {"ref": "N9", "value": "工序名称",       "style": "bold11"},
     {"ref": "O9", "value": "总流程",         "style": "bold11"},
+    {"ref": "D9", "value": "",               "style": "bold11", "merge": "D9:I11"},
     {"ref": "A10", "value": "产品类型",      "style": "bold11", "fill": "orange"},
     {"ref": "B10", "value": "图号",          "style": "bold11", "fill": "orange"},
     {"ref": "C10", "value": "工艺卡号",      "style": "bold11", "fill": "orange"},
@@ -108,8 +109,10 @@
     "rows": [
       {
         "cells": [
+          {"ref": "A{last_row+1}", "value": "", "style": "bold11"},
           {"ref": "A{last_row+3}", "value": "变更记录", "style": "sec", "merge": "A{last_row+3}:O{last_row+3}"}
         ],
+        "merges": ["A{last_row+1}:O{last_row+2}"],
         "row_height": 24
       },
       {

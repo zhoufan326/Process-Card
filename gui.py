@@ -4,17 +4,16 @@ r"""Process Card — 流程卡片管理系统。
 布局:
 ┌────────────────────────────────────────────┐
 │  ■ Process Card    流程卡片                │
-├────────────────────────────────────────────┤
-│  ■ 项目文件  [preset.json ▾] [加载][保存][浏览] │
 ├──────────────┬─────────────────────────────┤
 │  表单区       │                             │
 │  车间/名称/  │      Treeview 主数据区       │
 │  对象/要求   │                             │
-│  [保存][新建]│                             │
+│  [新建组]    │                             │
 │  [+要求][删除]│                            │
-│  [导出Excel] │                             │
+│  [导出工艺卡] │                             │
+│  [工艺计算]  │                             │
 ├──────────────┴─────────────────────────────┤
-│  ■ 就绪                                    │
+│  ■ 就绪（默认加载 manufacturing_process.json）  │
 └────────────────────────────────────────────┘
 """
 
@@ -24,7 +23,6 @@ from tkinter import filedialog, messagebox, ttk
 
 from set import TaskGroup, Tasks, load_preset, save_preset
 from tree_drag_controller import TreeDragController
-from file_manager import FileManager
 
 # ──────────────────────────────────────────────
 # 中式古典配色
@@ -48,6 +46,10 @@ TAG_REQ = "req"
 PAD_X = 12
 PAD_Y = 4
 FONT = "Microsoft YaHei"
+
+
+PROJ_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_JSON = os.path.join(PROJ_DIR, "manufacturing_process.json")
 
 
 # ──────────────────────────────────────────────
@@ -88,9 +90,10 @@ class TaskApp:
         self._build_footer()
         self._init_drag_ctrl()
         self._bind_events()
-        self._file_mgr.refresh_file_list()
+        load_preset(DEFAULT_JSON)
         self._refresh_tree()
         self.bay_entry.focus_set()
+        self._set_status(f"已加载 {os.path.basename(DEFAULT_JSON)} ({len(Tasks)} 组)")
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     # ── 全局样式 ──────────────────────────────
@@ -142,19 +145,6 @@ class TaskApp:
         tk.Label(left, text="\u25a0 工序编辑",
                  font=(FONT, 11, "bold"), fg=CLR_ACCENT, bg=CLR_HEADER,
                  anchor="w", padx=14).pack(fill="x", ipady=6)
-
-        # 文件管理栏嵌入
-        fb = tk.Frame(left, bg=CLR_PAPER)
-        fb.pack(fill="x", pady=(6, 0))
-        self._file_mgr = FileManager(
-            fb,
-            script_dir=os.path.dirname(os.path.abspath(__file__)),
-            on_load=self._do_load,
-            on_save=self._do_save,
-            set_status=self._set_status,
-            bg=CLR_PAPER,
-        )
-        self._file_mgr.pack(fill="x", expand=True)
 
         # 表单面板
         form_box = tk.Frame(left, bg=CLR_PANEL, bd=0,
@@ -317,35 +307,45 @@ class TaskApp:
         self.root.title("Process Card · 流程管理")
 
     def _on_closing(self):
+        self._apply_form_to_tasks()
         if self._dirty:
             ans = messagebox.askyesnocancel("未保存的更改",
                 "文件已修改，是否保存？\n\n\"是\" = 保存并退出\n\"否\" = 不保存直接退出\n\"取消\" = 返回程序")
             if ans is None:
                 return
             if ans:
-                if self._file_mgr and self._file_mgr.current_file:
-                    save_preset(self._file_mgr.current_file)
-                else:
-                    self._file_mgr._on_save_as()
+                self._save_all()
+        else:
+            # 即使没有工序修改，也确保 field_schema.json 持久化
+            self._save_field_schema()
         self.root.destroy()
 
-    # ── 文件管理回调 ──────────────────────────
-
-    def _do_load(self, path: str):
-        """FileManager 的加载回调：清空状态，加载并刷新。"""
-        self._edit_group_idx = None
-        self._edit_req_idx = -1
-        self._clear_inputs()
-        load_preset(path)
-        self._refresh_tree()
+    def _save_all(self):
+        """刷新表单编辑并持久化所有用户数据。"""
+        self._apply_form_to_tasks()
+        save_preset(DEFAULT_JSON)
+        self._save_field_schema()
         self._clear_dirty()
-        name = os.path.basename(path)
-        self._set_status(f"已加载 {len(Tasks)} 组（{name}）")
+        self._set_status("数据已保存")
 
-    def _do_save(self, path: str):
-        """FileManager 的保存回调：将 Tasks 写入文件。"""
-        save_preset(path)
-        self._clear_dirty()
+    def _save_field_schema(self):
+        """持久化 field_schema.json（透镜参数默认值）。
+        
+        工艺计算窗口在每次计算时已自动保存，此处作为关闭前的安全兜底。
+        """
+        import json, time
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
+        for attempt in range(3):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    schema = json.load(f)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(schema, f, ensure_ascii=False, indent=2)
+                return
+            except OSError:
+                if attempt < 2:
+                    time.sleep(0.5)
+                continue
 
     # ── 输入框操作 ────────────────────────────
 
@@ -658,6 +658,7 @@ class TaskApp:
                 ProcessPlanApp(calc_root)
                 self.root.wait_window(calc_root)  # 等待子窗口关闭，不阻塞主事件循环
                 # 关闭后同步
+                self._save_field_schema()
                 self._invalidate_ctx_cache()
                 self._refresh_tree()
                 self._set_status("参数已同步")
