@@ -162,7 +162,7 @@ def calculate(p: LensParams) -> CalcResult:
     r = CalcResult()
     
     # ── 焦距 (透镜制造者公式) ──
-    # 1/f = (n-1)*(1/R1 - 1/R2) + (n-1)^2 * Tc / (n * R1 * （-R2）)
+    # 1/f = (n-1)*(1/R1 - （-1/R2）) + (n-1)^2 * Tc / (n * R1 * （-R2）)
     #这里给R2取负号，采用Zemax中的判断方式。（原本是凸正凹负
     term1 = (p.n - 1) * (1.0 / p.r1 - 1.0 / (-p.r2))
     term2 = (p.n - 1) ** 2 * p.tc / (p.n * p.r1 * (-p.r2))

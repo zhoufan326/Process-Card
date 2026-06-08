@@ -372,14 +372,18 @@
       "ctx": "${N_S1}",
       "source": "params",
       "attr": "s1_n",
-      "fmt": ".0f",
+      "fmt": "s",
+      "prefix": "N：≤",
+      "suffix": "λ",
       "hide_zero": true
     },
     {
       "ctx": "${N_S2}",
       "source": "params",
       "attr": "s2_n",
-      "fmt": ".0f",
+      "fmt": "s",
+      "prefix": "N：≤",
+      "suffix": "λ",
       "hide_zero": true
     },
     {
@@ -406,7 +410,7 @@
       "attr": "s1_rms",
       "fmt": ".0f",
       "prefix": "RMS：≤",
-      "suffix": "nm",
+      "suffix": "λ",
       "hide_zero": true
     },
     {
@@ -415,7 +419,7 @@
       "attr": "s2_rms",
       "fmt": ".0f",
       "prefix": "RMS：≤",
-      "suffix": "nm",
+      "suffix": "λ",
       "hide_zero": true
     },
     {

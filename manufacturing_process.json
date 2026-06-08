@@ -26,7 +26,7 @@
     "obj": "S1",
     "requires": [
       "CA：＞Φ${CA_S1_strict}（加严）",
-      "N＜${N_S1} ${IRR_S1} ${RMS_S1}",
+      "${N_S1} ${IRR_S1} ${RMS_S1}",
       "控制曲率范围（${r1_lower}～${r1_upper}）",
       "粗糙度：＜${roughness_s1}",
       "S/D：${SD_S1}"
@@ -47,7 +47,7 @@
     "requires": [
       "S/D：${SD_S2}",
       "CA：＞Φ${CA_S2_strict}（加严）",
-      "N＜${N_S2} ${IRR_S2} ${RMS_S2}",
+      "${N_S2} ${IRR_S2} ${RMS_S2}",
       "控制曲率范围（${r2_lower}～${r2_upper}）",
       "粗糙度：＜${roughness_s2}",
       "Tc=${tc_polish2}±${tc_tol}"
