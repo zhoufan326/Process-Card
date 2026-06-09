@@ -3,11 +3,14 @@
 ; 使用 ISCC.exe 编译: ISCC installer.iss
 
 #define MyAppName "Process Card"
-#define MyAppVersion "0.2.2"
+#define MyAppVersion "0.3.1"
 #define MyAppPublisher "Optic Studio"
 #define MyAppURL ""
-#define MyAppExeName "ProcessCard_v" + MyAppVersion + ".exe"
 #define MyAppIcon "Optic_card.ico"
+; 安装到程序目录时使用固定文件名（卸载/升级时正确覆盖）
+#define MyAppExeName "ProcessCard.exe"
+; dist/ 中打包产出的版本号文件名
+#define MyAppDistExe "ProcessCard_v" + MyAppVersion + ".exe"
 
 [Setup]
 AppId={{8A2B3C4D-5E6F-7890-ABCD-EF1234567890}
@@ -34,8 +37,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式:"; Flags: checkedonce
 
 [Files]
-; 主程序
-Source: "dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; 主程序 — 源文件带版本号，安装时重命名为固定名
+Source: "dist\{#MyAppDistExe}"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
 
 ; 系统配置文件（程序会在此目录读写）
 Source: "field_schema.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -58,6 +61,10 @@ Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Working
 Filename: "{app}\{#MyAppExeName}"; Description: "运行 Process Card"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
+
+; 清理旧版本版本号命名的 exe 残留
+[UninstallDelete]
+Type: files; Name: "{app}\ProcessCard_v*.exe"
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);

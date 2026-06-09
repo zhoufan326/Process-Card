@@ -39,5 +39,9 @@ def save_preset(json_path: str):
         }
         for g in Tasks
     ]
+    # 为有 row_height 的组添加该字段（默认为 None 不保存，避免膨胀）
+    for i, g in enumerate(Tasks):
+        if g.row_height is not None:
+            data[i]["row_height"] = g.row_height
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)

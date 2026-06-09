@@ -297,16 +297,38 @@ class TaskApp:
     # ── 自动持久化 ────────────────────────────
 
     def _auto_save(self):
-        """立即将当前表单同步到 Tasks 并持久化 manufacturing_process.json。"""
+        """立即将当前表单同步到 Tasks 并持久化两个 JSON 文件。"""
         self._apply_form_to_tasks()
         save_preset(DEFAULT_JSON)
+        self._save_field_schema()
         self._set_status("已自动保存")
 
     def _on_closing(self):
-        """关闭窗口时自动保存所有数据。"""
+        """关闭窗口时自动保存所有数据到两个 JSON 文件。"""
         self._apply_form_to_tasks()
         save_preset(DEFAULT_JSON)
+        self._save_field_schema()
         self.root.destroy()
+
+    def _save_field_schema(self):
+        """持久化 field_schema.json（读-写回，确保文件状态与 GUI 一致）。
+        
+        工艺计算窗口在每次计算时已自动保存了 lens 参数到该文件，
+        此处作为安全兜底确保文件被写入。
+        """
+        import json, time
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
+        for attempt in range(3):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    schema = json.load(f)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(schema, f, ensure_ascii=False, indent=2)
+                return
+            except OSError:
+                if attempt < 2:
+                    time.sleep(0.5)
+                continue
 
     # ── 输入框操作 ────────────────────────────
 
@@ -331,13 +353,27 @@ class TaskApp:
     # ── 实时同步：表单 → Tasks → Treeview ────
 
     def _on_root_click(self, event=None):
-        """点击 GUI 任意位置时同步表单内容到 Tasks 并自动保存。
-        跳过输入控件自身的点击（避免干扰光标定位）。"""
+        """点击任意位置时同步表单到 Tasks 并自动保存。
+        仅在点击非输入控件时刷新树显示并恢复选中高亮。"""
         if self._edit_group_idx is not None and event is not None:
-            w = event.widget
-            # 只在点击 Treeview 或背景（Frame/Label）时同步，不干扰 Entry/Text 的光标
-            if isinstance(w, (ttk.Treeview, tk.Frame, tk.Label, tk.Button)):
-                self._auto_save()
+            self._auto_save()
+            # 点击非输入控件时才刷新树（点击 Entry/Text 不刷新）
+            if not isinstance(event.widget, (tk.Entry, tk.Text)):
+                self._refresh_tree()
+                self._restore_selection()
+
+    def _restore_selection(self):
+        """刷新树后恢复当前编辑项的选中高亮状态。"""
+        if self._edit_group_idx is None:
+            return
+        if self._edit_req_idx >= 0:
+            item_id = self._req_item_id(self._edit_group_idx, self._edit_req_idx)
+        else:
+            item_id = self._group_item_id(self._edit_group_idx)
+        if self.tree.exists(item_id):
+            self.tree.selection_set(item_id)
+            self.tree.focus(item_id)
+            self.tree.see(item_id)
 
     def _apply_form_to_tasks(self):
         if self._edit_group_idx is None:
@@ -352,15 +388,6 @@ class TaskApp:
         if self._edit_req_idx >= 0:
             if req:
                 g.requires[self._edit_req_idx] = req
-
-        sel = self.tree.selection()
-        self._refresh_tree()
-        if sel:
-            for s in sel:
-                if self.tree.exists(s):
-                    self.tree.selection_set(s)
-                    self.tree.focus(s)
-                    break
 
     # ── 占位符解析（可失效缓存） ────────────────
 
@@ -425,6 +452,7 @@ class TaskApp:
                 self._edit_group_idx = src
         self._auto_save()
         self._refresh_tree()
+        self._restore_selection()
         self._set_status(f"已移动组 [{tgt + 1}] {group.process}")
 
     def _on_move_req(self, gi: int, src: int, tgt: int):
@@ -438,6 +466,7 @@ class TaskApp:
                 self._edit_req_idx = src
         self._auto_save()
         self._refresh_tree()
+        self._restore_selection()
         self._set_status(f"已移动要求 [{gi + 1}.{tgt + 1}] {req[:30]}…")
 
     # ── Treeview 操作 ─────────────────────────
@@ -536,15 +565,14 @@ class TaskApp:
     # ── 新建 / 添加 / 删除 ────────────
 
     def _on_new(self):
-        """在选中组之后插入新组，无选中则追加到末尾。"""
-        # 获取当前选中项所在的组索引
-        insert_idx = len(Tasks)  # 默认末尾
+        """在选中组的位置插入空白组，原组下移；无选中则追加末尾。"""
+        insert_idx = len(Tasks)
         sel = self.tree.selection()
         if sel:
             info = self._get_group_by_item(sel[0])
             if info is not None:
                 gi, _ = info
-                insert_idx = gi + 1  # 在选中组后面插入
+                insert_idx = gi  # 在选中组的位置插入，原组被挤到下一位置
 
         g = TaskGroup(bay="", process="新建工序", obj="")
         Tasks.insert(insert_idx, g)
@@ -553,6 +581,7 @@ class TaskApp:
         self._fill_inputs(g.bay, g.process, g.obj, "")
         self._auto_save()
         self._refresh_tree()
+        self._restore_selection()
         self.bay_entry.focus_set()
         self._set_status("新建组模式，填写内容后自动同步")
 
@@ -576,27 +605,23 @@ class TaskApp:
         self.req_text.delete("1.0", tk.END)
         self._auto_save()
         self._refresh_tree()
+        self._restore_selection()
         self._set_status(f"已添加要求到组 {g.process}（继续录入…）")
         return "break"  # 阻止 Text 组件插入换行
 
     def _on_delete(self):
+        """选中组→删整组，选中要求→删单条。均直接删除无弹窗。"""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo("删除提示", "请先选中要删除的项。")
             return
         info = self._get_group_by_item(sel[0])
         if info is None:
             return
         gi, ri = info
         if ri == -1:
-            if not messagebox.askyesno("确认删除", f"确定删除组 [{gi + 1}] {Tasks[gi].process}？"):
-                return
             Tasks.pop(gi)
         else:
-            g = Tasks[gi]
-            if not messagebox.askyesno("确认删除", f"确定删除要求「{g.requires[ri]}」？"):
-                return
-            g.requires.pop(ri)
+            Tasks[gi].requires.pop(ri)
         self._edit_group_idx, self._edit_req_idx = None, -1
         self._clear_inputs()
         self._auto_save()
@@ -646,6 +671,7 @@ class TaskApp:
                 # 关闭后同步：process_planning 已保存 field_schema.json，只需刷新缓存和界面
                 self._invalidate_ctx_cache()
                 self._refresh_tree()
+                self._restore_selection()
                 self._set_status("参数已同步")
             except Exception as e:
                 messagebox.showerror("启动失败", f"无法打开工艺计算:\n{e}")
@@ -676,6 +702,7 @@ class TaskApp:
             return
         self._invalidate_ctx_cache()
         self._refresh_tree()
+        self._restore_selection()
         self._set_status("参数已同步到显示")
 
 
