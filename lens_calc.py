@@ -9,17 +9,53 @@ r"""球面透镜参数计算核心。
 import json
 import math
 import os
+import sys
 from dataclasses import dataclass, make_dataclass, field
+
+
+# ═══ 应用根目录（读取 vs 写入路径分离） ═══
+def _read_root() -> str:
+    """资源读取路径：打包环境=临时解压目录(sys._MEIPASS)，开发环境=项目目录。"""
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _write_root() -> str:
+    """数据写入路径：打包环境=exe所在目录，开发环境=项目目录。"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _ensure_data_files():
+    """打包环境下，将内置数据文件复制到写入目录（首次运行自动执行）。"""
+    if not getattr(sys, 'frozen', False):
+        return
+    src = _read_root()
+    dst = _write_root()
+    if src == dst:
+        return
+    import shutil
+    for name in ("field_schema.json", "manufacturing_process.json", "export_layout.json"):
+        dst_path = os.path.join(dst, name)
+        if not os.path.isfile(dst_path):
+            src_path = os.path.join(src, name)
+            if os.path.isfile(src_path):
+                shutil.copy2(src_path, dst_path)
 
 
 # ═══ 加载字段 Schema ═══
 
 def _load_schema() -> dict:
-    schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
-    with open(schema_path, "r", encoding="utf-8") as f:
+    path = os.path.join(_read_root(), "field_schema.json")
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 SCHEMA = _load_schema()
+
+# 首次运行确保数据文件在写入目录存在
+_ensure_data_files()
 
 
 # ═══ 光学/工艺经验常数 ═══

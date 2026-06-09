@@ -18,12 +18,12 @@ from openpyxl.styles import PatternFill, Alignment, Border, Side, Font
 from openpyxl.utils import get_column_letter
 
 from set import Tasks, load_preset
-from lens_calc import LensParams, CalcResult, calculate
+from lens_calc import LensParams, CalcResult, calculate, _read_root
 
 
 # ═══ 加载布局 JSON ═══
 def _load_layout() -> dict:
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "export_layout.json")
+    p = os.path.join(_read_root(), "export_layout.json")
     with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -31,7 +31,7 @@ _LAYOUT = _load_layout()
 
 # ═══ 加载 Schema（用于 _make_ctx） ═══
 def _load_schema() -> dict:
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
+    p = os.path.join(_read_root(), "field_schema.json")
     with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
 

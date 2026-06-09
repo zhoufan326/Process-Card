@@ -21,7 +21,7 @@ except ImportError:
 
 from lens_calc import (
     LensParams, CalcResult, calculate, SCHEMA,
-    _sag, _FRINGE_CONST,
+    _sag, _FRINGE_CONST, _write_root,
 )
 
 # ═══ 配色 (共享 gui.py 中式古典风格) ═══
@@ -199,9 +199,7 @@ class ProcessPlanApp:
         Args:
             silent: 为 True 时不弹窗（由 _on_calculate 自动调用时使用）
         """
-        schema_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "field_schema.json")
+        schema_path = os.path.join(_write_root(), "field_schema.json")
 
         try:
             with open(schema_path, "r", encoding="utf-8") as f:

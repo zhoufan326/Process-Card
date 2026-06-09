@@ -18,6 +18,7 @@ r"""Process Card — 流程卡片管理系统。
 """
 
 import os
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -48,7 +49,14 @@ PAD_Y = 4
 FONT = "Microsoft YaHei"
 
 
-PROJ_DIR = os.path.dirname(os.path.abspath(__file__))
+def _app_root() -> str:
+    """数据写入路径：打包环境=exe所在目录，开发环境=项目目录。"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+PROJ_DIR = _app_root()
 DEFAULT_JSON = os.path.join(PROJ_DIR, "manufacturing_process.json")
 
 
@@ -83,6 +91,7 @@ class TaskApp:
         self.root = root
         self._edit_group_idx: int | None = None
         self._edit_req_idx: int = -1
+        self._poll_after_id = None
 
         self._init_style()
         self._build_body()
@@ -319,8 +328,14 @@ class TaskApp:
 
     def _on_closing(self):
         """关闭窗口时覆盖写入两个 JSON 文件，确保 GUI 数据持久化。"""
+        # 停止工艺计算轮询
+        if self._poll_after_id is not None:
+            self.root.after_cancel(self._poll_after_id)
+            self._poll_after_id = None
+
         import json, time
-        schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
+        from lens_calc import _write_root
+        schema_path = os.path.join(_write_root(), "field_schema.json")
 
         # 1. 同步表单到 Tasks 并保存 manufacturing_process.json
         self._apply_form_to_tasks()
@@ -455,7 +470,8 @@ class TaskApp:
         if cls._ctx_cache is None:
             p = LensParams()
             r = calculate(p)
-            sp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
+            from lens_calc import _write_root
+            sp = os.path.join(_write_root(), "field_schema.json")
             with open(sp, "r", encoding="utf-8") as f:
                 schema = json.load(f)
             ctx = {}
@@ -725,10 +741,10 @@ class TaskApp:
 
         # ── 开发环境: 子进程方式 ──
         import subprocess
-        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "process_planning.py")
-        self._schema_mtime_before = os.path.getmtime(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json"))
+        script = os.path.join(_app_root(), "process_planning.py")
         try:
+            self._schema_mtime_before = os.path.getmtime(
+                os.path.join(_app_root(), "field_schema.json"))
             subprocess.Popen([_sys.executable, script])
             self._set_status("已打开工艺计算窗口（关闭后将自动同步）")
             self.root.after(500, self._check_process_calc_closed)
@@ -737,14 +753,15 @@ class TaskApp:
 
     def _check_process_calc_closed(self):
         """检测 field_schema.json mtime 变化 → 自动同步。"""
-        sp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
+        from lens_calc import _write_root
+        sp = os.path.join(_write_root(), "field_schema.json")
         try:
             mt = os.path.getmtime(sp)
         except OSError:
-            self.root.after(500, self._check_process_calc_closed)
+            self._poll_after_id = self.root.after(500, self._check_process_calc_closed)
             return
         if mt == self._schema_mtime_before:
-            self.root.after(500, self._check_process_calc_closed)
+            self._poll_after_id = self.root.after(500, self._check_process_calc_closed)
             return
         self._invalidate_ctx_cache()
         self._refresh_tree()
