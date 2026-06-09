@@ -2,11 +2,11 @@
 ; Inno Setup 6 脚本
 ; 使用 ISCC.exe 编译: ISCC installer.iss
 
-#define MyAppName "Process Card v0.2.0"
-#define MyAppVersion "0.2.0"
+#define MyAppName "Process Card"
+#define MyAppVersion "0.2.2"
 #define MyAppPublisher "Optic Studio"
 #define MyAppURL ""
-#define MyAppExeName "ProcessCard.exe"
+#define MyAppExeName "ProcessCard_v" + MyAppVersion + ".exe"
 #define MyAppIcon "Optic_card.ico"
 
 [Setup]

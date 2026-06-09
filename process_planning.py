@@ -145,11 +145,13 @@ class ProcessPlanApp:
                               wrap="word", insertbackground=CLR_ACCENT)
                 ent.pack(fill="x")
                 ent.insert("1.0", default)
+                ent.mark_set("insert", "1.0")  # 光标移到开头
             else:
                 ent = tk.Entry(frm, font=(FONT, 9), width=18, bg="white",
                                fg=CLR_TEXT, relief="solid", bd=1)
                 ent.pack(side="left")
                 ent.insert(0, default)
+                ent.icursor(0)  # 光标移到开头
 
             if unit:
                 tk.Label(frm, text=unit, font=(FONT, 8), fg=CLR_SUBTEXT,
@@ -164,6 +166,28 @@ class ProcessPlanApp:
                 if "attr" not in f:
                     continue
                 _add_field(f["attr"], f["label"], f.get("unit", ""))
+
+        # ── 上下键快速切换输入框 ──
+        self._entry_order = []
+        for section in SCHEMA["gui_sections"]:
+            for f in section["fields"]:
+                if "attr" in f and f["attr"] in self._entries:
+                    self._entry_order.append(self._entries[f["attr"]])
+
+        def _nav(delta):
+            """delta=+1 向下, delta=-1 向上"""
+            focused = self.root.focus_get()
+            for i, w in enumerate(self._entry_order):
+                if w == focused:
+                    target = (i + delta) % len(self._entry_order)
+                    self._entry_order[target].focus_set()
+                    return
+            # 无焦点时默认聚焦第一个
+            self._entry_order[0].focus_set()
+
+        for w in self._entry_order:
+            w.bind("<Down>", lambda e: _nav(+1), add="+")
+            w.bind("<Up>", lambda e: _nav(-1), add="+")
 
     # ═══════════════════════════════════════════════
     #  应用按钮 → Read-Modify-Write 模式
@@ -298,11 +322,13 @@ class ProcessPlanApp:
         t.configure(state="normal")
         t.delete("1.0", "end")
         t.tag_configure("hdr", foreground=CLR_ACCENT, font=(FONT, 11, "bold"))
+        # 设置制表符停靠位（像素）：标签列~18字符宽，值列~36字符宽
+        t.configure(tabs=("140p", "300p"))
 
         def _h(text):
-            t.insert("end", f"\n{'=' * 45}\n  {text}\n{'=' * 45}\n", "hdr")
+            t.insert("end", f"\n{'=' * 45}\n{text}\n{'=' * 45}\n", "hdr")
         def _l(label, value, unit=""):
-            t.insert("end", f"  {label:\u3000<18s} {value:>12} {unit}\n")
+            t.insert("end", f"{label}\t{value}\t{unit}\n")
 
         _h("基本光学参数")
         _l("焦距 f", f"{r.focal_length:.4f}", "mm")

@@ -3,7 +3,6 @@
     "bay": "成形",
     "process": "成形",
     "obj": "",
-    "row_height": 40,
     "requires": [
       "1.材料：${material}",
       "2.领取平滚件，尺寸：Φ${blank_d}±${blank_d_tol}×${blank_t}±${blank_t_tol}",

@@ -374,7 +374,6 @@
       "attr": "s1_n",
       "fmt": "s",
       "prefix": "N：≤",
-      "suffix": "λ",
       "hide_zero": true
     },
     {
@@ -383,7 +382,6 @@
       "attr": "s2_n",
       "fmt": "s",
       "prefix": "N：≤",
-      "suffix": "λ",
       "hide_zero": true
     },
     {
