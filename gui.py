@@ -228,17 +228,32 @@ class TaskApp:
             ent.grid(row=row, column=1, sticky="ew", pady=PAD_Y)
             setattr(self, attr, ent)
 
+        # 行高（组级别）
+        tk.Label(
+            frm, text="行 高", font=(FONT, 10, "bold"),
+            fg=CLR_SUBTEXT, bg=CLR_PANEL, width=6, anchor="e",
+        ).grid(row=3, column=0, padx=(0, 6), pady=PAD_Y, sticky="e")
+        self.row_height_entry = tk.Entry(
+            frm, font=(FONT, 10), width=22,
+            bg=CLR_LIGHT, fg=CLR_TEXT, relief="flat", bd=0,
+            insertbackground=CLR_ACCENT,
+        )
+        self.row_height_entry.grid(row=3, column=1, sticky="ew", pady=PAD_Y)
+        tk.Label(
+            frm, text="磅（留空则自动）", font=(FONT, 8), fg=CLR_SUBTEXT, bg=CLR_PANEL,
+        ).grid(row=3, column=2, padx=(4, 0), pady=PAD_Y, sticky="w")
+
         # 要求 — 多行输入
         tk.Label(
             frm, text="要 求", font=(FONT, 10, "bold"),
             fg=CLR_SUBTEXT, bg=CLR_PANEL, width=6, anchor="e",
-        ).grid(row=3, column=0, padx=(0, 6), pady=PAD_Y, sticky="ne")
+        ).grid(row=4, column=0, padx=(0, 6), pady=PAD_Y, sticky="ne")
         self.req_text = tk.Text(
             frm, font=(FONT, 10), width=30, height=5,
             bg=CLR_LIGHT, fg=CLR_TEXT, relief="flat", bd=6,
             wrap="word", insertbackground=CLR_ACCENT,
         )
-        self.req_text.grid(row=3, column=1, columnspan=2, sticky="ew", pady=PAD_Y)
+        self.req_text.grid(row=4, column=1, columnspan=2, sticky="ew", pady=PAD_Y)
         frm.grid_columnconfigure(2, weight=1)
 
     def _build_buttons(self, parent):
@@ -297,52 +312,64 @@ class TaskApp:
     # ── 自动持久化 ────────────────────────────
 
     def _auto_save(self):
-        """立即将当前表单同步到 Tasks 并持久化两个 JSON 文件。"""
+        """立即将当前表单同步到 Tasks 并持久化 manufacturing_process.json。"""
         self._apply_form_to_tasks()
         save_preset(DEFAULT_JSON)
-        self._save_field_schema()
         self._set_status("已自动保存")
 
     def _on_closing(self):
-        """关闭窗口时自动保存所有数据到两个 JSON 文件。"""
+        """关闭窗口时覆盖写入两个 JSON 文件，确保 GUI 数据持久化。"""
+        import json, time
+        schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
+
+        # 1. 同步表单到 Tasks 并保存 manufacturing_process.json
         self._apply_form_to_tasks()
         save_preset(DEFAULT_JSON)
-        self._save_field_schema()
-        self.root.destroy()
 
-    def _save_field_schema(self):
-        """持久化 field_schema.json（读-写回，确保文件状态与 GUI 一致）。
-        
-        工艺计算窗口在每次计算时已自动保存了 lens 参数到该文件，
-        此处作为安全兜底确保文件被写入。
-        """
-        import json, time
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "field_schema.json")
-        for attempt in range(3):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    schema = json.load(f)
-                with open(path, "w", encoding="utf-8") as f:
-                    json.dump(schema, f, ensure_ascii=False, indent=2)
-                return
-            except OSError:
-                if attempt < 2:
-                    time.sleep(0.5)
-                continue
+        # 2. 将当前 LensParams 默认值写入 field_schema.json
+        try:
+            with open(schema_path, "r", encoding="utf-8") as f:
+                schema = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+        else:
+            from lens_calc import LensParams
+            p = LensParams()
+            for section in schema.get("gui_sections", []):
+                for f in section.get("fields", []):
+                    if "attr" not in f:
+                        continue
+                    val = getattr(p, f["attr"], None)
+                    if val is not None:
+                        f["default"] = val
+            for attempt in range(3):
+                try:
+                    with open(schema_path, "w", encoding="utf-8") as f:
+                        json.dump(schema, f, ensure_ascii=False, indent=2)
+                    break
+                except OSError:
+                    if attempt < 2:
+                        time.sleep(0.5)
+                    continue
+
+        self.root.destroy()
 
     # ── 输入框操作 ────────────────────────────
 
-    def _fill_inputs(self, bay="", process="", obj="", req=""):
+    def _fill_inputs(self, bay="", process="", obj="", req="", row_height=""):
         for ent, val in [
             (self.bay_entry, bay), (self.process_entry, process),
             (self.obj_entry, obj),
         ]:
             ent.delete(0, tk.END)
             ent.insert(0, val)
-            ent.icursor(0)  # 光标移到开头
+            ent.icursor(0)
+        self.row_height_entry.delete(0, tk.END)
+        if row_height:
+            self.row_height_entry.insert(0, str(row_height))
         self.req_text.delete("1.0", tk.END)
         self.req_text.insert("1.0", req)
-        self.req_text.mark_set("insert", "1.0")  # 光标移到开头
+        self.req_text.mark_set("insert", "1.0")
 
     def _clear_inputs(self):
         self._fill_inputs()
@@ -353,12 +380,29 @@ class TaskApp:
     # ── 实时同步：表单 → Tasks → Treeview ────
 
     def _on_root_click(self, event=None):
-        """点击任意位置时同步表单到 Tasks 并自动保存。
-        仅在点击非输入控件时刷新树显示并恢复选中高亮。"""
+        """点击任意位置时保存数据。
+        
+        - 组模式 + 有文本 + 点击输入区以外 → 添加为新要求并清空
+        - 编辑模式 → 保存修改
+        
+        点击输入控件时不刷新树（避免干扰光标），点击其他区域时刷新。"""
         if self._edit_group_idx is not None and event is not None:
+            is_input = isinstance(event.widget, (tk.Entry, tk.Text))
+            is_group_mode = (self._edit_req_idx == -1)
+            had_text = bool(self._get_req_text())
+
+            # 先保存表单到 Tasks 和 manufacturing_process.json
             self._auto_save()
+
+            # 组模式 + 有文本 + 点击外部 → 添加新要求
+            if is_group_mode and had_text and not is_input:
+                g = Tasks[self._edit_group_idx]
+                g.requires.append(self._get_req_text())
+                self.req_text.delete("1.0", tk.END)
+                save_preset(DEFAULT_JSON)
+
             # 点击非输入控件时才刷新树（点击 Entry/Text 不刷新）
-            if not isinstance(event.widget, (tk.Entry, tk.Text)):
+            if not is_input:
                 self._refresh_tree()
                 self._restore_selection()
 
@@ -376,18 +420,20 @@ class TaskApp:
             self.tree.see(item_id)
 
     def _apply_form_to_tasks(self):
+        """同步表单数据到 Tasks；编辑模式下保存要求修改。"""
         if self._edit_group_idx is None:
             return
         bay = self.bay_entry.get().strip()
         process = self.process_entry.get().strip()
         obj = self.obj_entry.get().strip()
+        rh_raw = self.row_height_entry.get().strip()
         req = self._get_req_text()
 
         g = Tasks[self._edit_group_idx]
         g.bay, g.process, g.obj = bay, process, obj
-        if self._edit_req_idx >= 0:
-            if req:
-                g.requires[self._edit_req_idx] = req
+        g.row_height = int(rh_raw) if rh_raw.isdigit() else None
+        if self._edit_req_idx >= 0 and req:
+            g.requires[self._edit_req_idx] = req  # 编辑模式：保存修改
 
     # ── 占位符解析（可失效缓存） ────────────────
 
@@ -548,7 +594,7 @@ class TaskApp:
         if ri == -1:
             self._edit_group_idx = gi
             self._edit_req_idx = -1
-            self._fill_inputs(g.bay, g.process, g.obj, "")
+            self._fill_inputs(g.bay, g.process, g.obj, "", g.row_height)
             self._set_status(f"选中组 [{gi + 1}] {g.process}")
         else:
             self._edit_group_idx = gi
@@ -578,7 +624,7 @@ class TaskApp:
         Tasks.insert(insert_idx, g)
         self._edit_group_idx = insert_idx
         self._edit_req_idx = -1
-        self._fill_inputs(g.bay, g.process, g.obj, "")
+        self._fill_inputs("", "新建工序", "", "", "")
         self._auto_save()
         self._refresh_tree()
         self._restore_selection()
@@ -586,28 +632,28 @@ class TaskApp:
         self._set_status("新建组模式，填写内容后自动同步")
 
     def _on_req_enter(self, event=None):
-        """Enter 键：编辑已有要求时保存，组模式下自动添加新要求并清空续录。"""
+        """Enter 键确认：编辑模式→保存修改，组模式→添加为新要求。"""
         if self._edit_group_idx is None:
             return
         text = self._get_req_text()
         if not text:
-            return "break"  # 阻止插入空行
+            return "break"
 
         g = Tasks[self._edit_group_idx]
 
-        # 如果正在编辑已有要求，先保存修改（将当前文本覆盖到原位置）
         if self._edit_req_idx >= 0:
+            # 编辑模式：只保存修改，不追加
             g.requires[self._edit_req_idx] = text
+        else:
+            # 组模式：添加为新要求，清空文本框继续录入
+            g.requires.append(text)
+            self.req_text.delete("1.0", tk.END)
 
-        # 添加为新要求，然后回到组模式继续录入
-        g.requires.append(text)
-        self._edit_req_idx = -1
-        self.req_text.delete("1.0", tk.END)
         self._auto_save()
         self._refresh_tree()
         self._restore_selection()
-        self._set_status(f"已添加要求到组 {g.process}（继续录入…）")
-        return "break"  # 阻止 Text 组件插入换行
+        self._set_status(f"已保存到组 {g.process}")
+        return "break"
 
     def _on_delete(self):
         """选中组→删整组，选中要求→删单条。均直接删除无弹窗。"""

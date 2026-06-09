@@ -31,10 +31,10 @@ DATAS = [
     (_p("export_layout.json"), "."),
 ]
 
-# ── 隐藏导入 ──
+# ── 隐藏导入（确保 PyInstaller 完整打包这些库的所有子模块） ──
 HIDDEN = [
-    "openpyxl.cell._writer",
-    "openpyxl.reader.excel",
+    "openpyxl",
+    "matplotlib",
 ]
 
 # ── 明确排除 (避免 matplotlib 拖入 Qt 等) ──
