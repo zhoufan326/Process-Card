@@ -505,13 +505,20 @@ class TaskApp:
     # ── 组拖拽 ────────────────────────────────
 
     def _on_move_group(self, src: int, tgt: int):
+        was_edit = (self._edit_group_idx == src)
+
         group = Tasks.pop(src)
+
+        if self._edit_group_idx is not None and not was_edit and self._edit_group_idx > src:
+            self._edit_group_idx -= 1
+
         Tasks.insert(tgt, group)
+
         if self._edit_group_idx is not None:
-            if self._edit_group_idx == src:
+            if was_edit:
                 self._edit_group_idx = tgt
-            elif self._edit_group_idx == tgt:
-                self._edit_group_idx = src
+            elif self._edit_group_idx >= tgt:
+                self._edit_group_idx += 1
         self._auto_save()
         self._refresh_tree()
         self._restore_selection()
@@ -519,13 +526,21 @@ class TaskApp:
 
     def _on_move_req(self, gi: int, src: int, tgt: int):
         """组内 req 重排。"""
+        in_edit_group = (self._edit_group_idx == gi)
+        was_edit_req = (in_edit_group and self._edit_req_idx == src)
+
         req = Tasks[gi].requires.pop(src)
+
+        if in_edit_group and not was_edit_req and self._edit_req_idx > src:
+            self._edit_req_idx -= 1
+
         Tasks[gi].requires.insert(tgt, req)
-        if self._edit_group_idx == gi and self._edit_req_idx >= 0:
-            if self._edit_req_idx == src:
+
+        if in_edit_group:
+            if was_edit_req:
                 self._edit_req_idx = tgt
-            elif self._edit_req_idx == tgt:
-                self._edit_req_idx = src
+            elif self._edit_req_idx >= tgt:
+                self._edit_req_idx += 1
         self._auto_save()
         self._refresh_tree()
         self._restore_selection()
