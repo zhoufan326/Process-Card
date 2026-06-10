@@ -4,8 +4,6 @@ r"""球面透镜工艺计算 — GUI 界面。
 计算核心委托给 lens_calc.py。
 """
 
-import io
-import json
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -19,9 +17,12 @@ try:
 except ImportError:
     _HAS_MPL = False
 
+import material_db
+from app_state import AppState
+
 from lens_calc import (
     LensParams, CalcResult, calculate, SCHEMA,
-    _sag, _FRINGE_CONST, _write_root,
+    _sag, _FRINGE_CONST,
 )
 
 # ═══ 配色 (共享 gui.py 中式古典风格) ═══
@@ -41,9 +42,11 @@ FONT = "Microsoft YaHei"
 class ProcessPlanApp:
     """球面透镜工艺计算 GUI。"""
 
-    def __init__(self, root: tk.Tk | tk.Toplevel):
+    def __init__(self, root: tk.Tk | tk.Toplevel, app_state: AppState | None = None):
         self.root = root
-        self._params = LensParams()
+        self.state = app_state or AppState()
+        self._params = self.state.lens_params
+        self._material_dict, self._material_list = material_db.load_materials()
         self._last_result = None
         self._build_ui()
         self._on_calculate()
@@ -128,7 +131,7 @@ class ProcessPlanApp:
     def _build_input_fields(self, panel):
         """由 field_schema.json 驱动，自动生成全部输入控件。"""
         self._entries = {}
-        _DEFAULTS = LensParams()
+        _DEFAULTS = self.state.lens_params
 
         _row = [0]
 
@@ -156,6 +159,16 @@ class ProcessPlanApp:
                 ent.pack(fill="x")
                 ent.insert("1.0", default)
                 ent.mark_set("insert", "1.0")  # 光标移到开头
+            elif attr == "material":
+                ent = ttk.Combobox(frm, values=self._material_list,
+                                   font=(FONT, 9), width=18)
+                ent.pack(side="left")
+                if default in self._material_dict:
+                    ent.set(default)
+                else:
+                    ent.set(default)
+                ent.bind("<<ComboboxSelected>>", self._on_material_changed)
+                ent.bind("<KeyRelease>", self._on_material_changed)
             else:
                 ent = tk.Entry(frm, font=(FONT, 9), width=18, bg="white",
                                fg=CLR_TEXT, relief="solid", bd=1)
@@ -199,68 +212,62 @@ class ProcessPlanApp:
             w.bind("<Down>", lambda e: _nav(+1), add="+")
             w.bind("<Up>", lambda e: _nav(-1), add="+")
 
+        # 初始同步：默认材料 → 折射率
+        self._on_material_changed()
+
+    # ── 材料联动 ──
+
+    def _on_material_changed(self, event=None):
+        """材料下拉选择或手动输入后，自动查询并填入折射率 n。"""
+        if "material" not in self._entries or "n" not in self._entries:
+            return
+        name = self._entries["material"].get().strip()
+        n_val = self._material_dict.get(name)
+        if n_val is not None and n_val > 0:
+            n_ent = self._entries["n"]
+            old = n_ent.get().strip()
+            new = str(n_val)
+            if old != new:
+                n_ent.delete(0, "end")
+                n_ent.insert(0, new)
+
     # ═══════════════════════════════════════════════
-    #  应用按钮 → Read-Modify-Write 模式
+    #  应用按钮 → 永久保存到 field_schema.json
     # ═══════════════════════════════════════════════
 
     def _on_apply(self, silent=False):
-        """将当前所有输入值持久化到 field_schema.json 的 default 字段。
-        
-        Args:
-            silent: 为 True 时不弹窗（由 _on_calculate 自动调用时使用）
-        """
+        """将当前输入值永久保存到 field_schema.json 和 user_params.json。"""
+        self._sync_params_to_state()
+        self.state.save_user_params()
+        # 同步到 field_schema.json（写入 default 字段）
+        import json, time
+        from lens_calc import _write_root
         schema_path = os.path.join(_write_root(), "field_schema.json")
-
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
                 schema = json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
-            messagebox.showerror("错误", f"无法读取 field_schema.json\n路径: {schema_path}\n原因: {e}")
-            return
-
-        for section in schema.get("gui_sections", []):
-            for f in section.get("fields", []):
-                if "attr" not in f or f["attr"] not in self._entries:
-                    continue
-                widget = self._entries[f["attr"]]
-                if isinstance(widget, tk.Text):
-                    raw = widget.get("1.0", "end-1c").strip()
-                else:
-                    raw = widget.get().strip()
-                if f["type"] == "float":
-                    f["default"] = float(raw) if raw else 0.0
-                elif f["type"] == "int":
-                    f["default"] = int(raw) if raw else 0
-                else:
-                    f["default"] = raw
-
-        import time
-        success = False
-        for attempt in range(3):
-            try:
-                with open(schema_path, "w", encoding="utf-8") as f:
-                    json.dump(schema, f, ensure_ascii=False, indent=2)
-                success = True
-                break
-            except OSError:
-                if attempt < 2:
-                    time.sleep(0.5)
-                continue
-        if success:
-            if not silent:
-                messagebox.showinfo(
-                    "应用完成",
-                    "当前参数已更新到 field_schema.json。\n返回主窗口后参数将同步显示。")
-            self._status.set("参数已应用")
+        except (OSError, json.JSONDecodeError):
+            pass
         else:
-            if not silent:
-                messagebox.showerror(
-                    "写入失败",
-                    "无法写入 field_schema.json，文件可能被占用。\n\n"
-                    "建议:\n"
-                    "1. 关闭 VS Code 中 field_schema.json 的标签页\n"
-                    "2. 关闭其他可能打开该文件的程序\n"
-                    "3. 稍后重试")
+            p = self.state.lens_params
+            for section in schema.get("gui_sections", []):
+                for f in section.get("fields", []):
+                    if "attr" in f:
+                        val = getattr(p, f["attr"], None)
+                        if val is not None:
+                            f["default"] = val
+            for attempt in range(3):
+                try:
+                    with open(schema_path, "w", encoding="utf-8") as f:
+                        json.dump(schema, f, ensure_ascii=False, indent=2)
+                    break
+                except OSError:
+                    if attempt < 2:
+                        time.sleep(0.5)
+                    continue
+        if not silent:
+            messagebox.showinfo("应用完成", "当前参数已永久保存到 field_schema.json。")
+        self._status.set("参数已应用")
 
     # ── 校验 & 计算 ──
 
@@ -289,29 +296,28 @@ class ProcessPlanApp:
             return f"S2 CA ({ca2}) 不能大于外径 ({dia})。"
         return None
 
+    def _sync_params_to_state(self):
+        """将 GUI 输入值同步到 self.state.lens_params。"""
+        e = self._entries
+        _TYPE_MAP = {"str": str, "float": float, "int": int}
+        kwargs = {}
+        for section in SCHEMA["gui_sections"]:
+            for f in section["fields"]:
+                if "attr" not in f:
+                    continue
+                widget = e[f["attr"]]
+                if isinstance(widget, tk.Text):
+                    raw = widget.get("1.0", "end-1c").strip()
+                else:
+                    raw = widget.get().strip()
+                converter = _TYPE_MAP.get(f["type"], str)
+                kwargs[f["attr"]] = converter(raw)
+        self.state.update_lens_params(**kwargs)
+        self._params = self.state.lens_params
+
     def _on_calculate(self):
         try:
-            e = self._entries
-            err = self._validate(e)
-            if err:
-                messagebox.showerror("输入错误", err)
-                return
-
-            _TYPE_MAP = {"str": str, "float": float, "int": int}
-            kwargs = {}
-            for section in SCHEMA["gui_sections"]:
-                for f in section["fields"]:
-                    if "attr" not in f:
-                        continue
-                    widget = e[f["attr"]]
-                    if isinstance(widget, tk.Text):
-                        raw = widget.get("1.0", "end-1c").strip()
-                    else:
-                        raw = widget.get().strip()
-                    converter = _TYPE_MAP.get(f["type"], str)
-                    kwargs[f["attr"]] = converter(raw)
-            self._params = LensParams(**kwargs)
-
+            self._sync_params_to_state()
         except Exception as ex:
             messagebox.showerror("输入错误", f"参数读取失败:\n{ex}")
             return
@@ -320,8 +326,6 @@ class ProcessPlanApp:
         self._last_result = result
         self._display_result(result)
         self._status.set(f"计算完成 — 焦距={result.focal_length}mm")
-        # 自动保存输入值到 field_schema.json，供 gui.py 导出时读取
-        self._on_apply(silent=True)
 
     # ── 结果展示 ──
 
@@ -576,5 +580,7 @@ class ProcessPlanApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    ProcessPlanApp(root)
+    state = AppState()
+    state.load_user_params()
+    ProcessPlanApp(root, app_state=state)
     root.mainloop()

@@ -17,7 +17,7 @@
           "label": "R1 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 678.0,
+          "default": 58.0,
           "_comment": "第1面曲率半径"
         },
         {
@@ -25,7 +25,7 @@
           "label": "R2 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 345.0,
+          "default": 24.944,
           "_comment": "第2面曲率半径"
         },
         {
@@ -33,7 +33,7 @@
           "label": "外径 D",
           "unit": "mm",
           "type": "float",
-          "default": 48.0,
+          "default": 15.0,
           "_comment": "透镜成品外径"
         },
         {
@@ -41,7 +41,7 @@
           "label": "中心厚度 Tc",
           "unit": "mm",
           "type": "float",
-          "default": 14.89,
+          "default": 2.42,
           "_comment": "透镜中心厚度"
         },
         {
@@ -78,7 +78,7 @@
           "label": "磨边预扩口径增量",
           "unit": "mm",
           "type": "float",
-          "default": 2.0,
+          "default": 1.0,
           "_comment": "磨边前预留口径余量"
         },
         {
@@ -108,7 +108,7 @@
           "label": "S1面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 0.78,
+          "default": 0.1,
           "_comment": "S1面铣磨材料去除量"
         },
         {
@@ -116,7 +116,7 @@
           "label": "S2面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 0.2,
+          "default": 0.1,
           "_comment": "S2面铣磨材料去除量"
         },
         {
@@ -124,7 +124,7 @@
           "label": "S1精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.2,
+          "default": 0.14,
           "_comment": "S1面精磨+抛光总去除量"
         },
         {
@@ -132,7 +132,7 @@
           "label": "S2精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.2,
+          "default": 0.14,
           "_comment": "S2面精磨+抛光总去除量"
         }
       ]
@@ -145,7 +145,7 @@
           "attr": "s1_n",
           "label": "S1 光圈数 N",
           "type": "float",
-          "default": 4.0,
+          "default": 2.0,
           "_comment": "S1面牛顿环光圈数"
         },
         {
@@ -153,14 +153,14 @@
           "label": "S1 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.9,
+          "default": 0.15,
           "_comment": "S1面局部光圈不规则度"
         },
         {
           "attr": "s2_n",
           "label": "S2 光圈数 N",
           "type": "float",
-          "default": 4.0,
+          "default": 2.0,
           "_comment": "S2面牛顿环光圈数"
         },
         {
@@ -168,7 +168,7 @@
           "label": "S2 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.9,
+          "default": 0.15,
           "_comment": "S2面局部光圈不规则度"
         },
         {
@@ -192,7 +192,7 @@
           "label": "粗糙度 S1",
           "unit": "nm",
           "type": "float",
-          "default": 5.0,
+          "default": 1.0,
           "_comment": "S1面粗糙度要求"
         },
         {
@@ -200,7 +200,7 @@
           "label": "粗糙度 S2",
           "unit": "nm",
           "type": "float",
-          "default": 5.0,
+          "default": 1.0,
           "_comment": "S2面粗糙度要求"
         }
       ]
@@ -213,35 +213,35 @@
           "attr": "lens_type",
           "label": "产品类型",
           "type": "str",
-          "default": "弯月透镜",
+          "default": "双凸透镜",
           "_comment": "透镜类型，如双凸透镜、平凸透镜等"
         },
         {
           "attr": "drawing_no",
           "label": "图号",
           "type": "str",
-          "default": "M0294-G03",
+          "default": "M0292-G03",
           "_comment": "设计图号"
         },
         {
           "attr": "card_no",
           "label": "工艺卡号",
           "type": "str",
-          "default": "NQ0528",
+          "default": "NQ0658",
           "_comment": "工艺卡片编号"
         },
         {
           "attr": "author",
           "label": "制定",
           "type": "str",
-          "default": "戴磊",
+          "default": "周凡",
           "_comment": "工艺制定人员"
         },
         {
           "attr": "reviewer",
           "label": "审核",
           "type": "str",
-          "default": "林远至",
+          "default": "王千奥",
           "_comment": "工艺审核人员"
         },
         {
@@ -276,7 +276,7 @@
           "label": "S1 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 44.0,
+          "default": 13.0,
           "_comment": "S1面有效检测口径"
         },
         {
@@ -284,7 +284,7 @@
           "label": "S2 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 44.0,
+          "default": 13.0,
           "_comment": "S2面有效检测口径"
         },
         {
@@ -314,7 +314,7 @@
           "label": "透射偏心 S1",
           "unit": "′",
           "type": "float",
-          "default": 30.0,
+          "default": 1.0,
           "_comment": "S1面透射偏心允许值（arcmin）"
         },
         {
@@ -322,7 +322,7 @@
           "label": "透射偏心 S2",
           "unit": "′",
           "type": "float",
-          "default": 30.0,
+          "default": 1.0,
           "_comment": "S2面透射偏心允许值（arcmin）"
         }
       ]

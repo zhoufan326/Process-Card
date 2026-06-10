@@ -29,12 +29,15 @@ DATAS = [
     (_p("field_schema.json"), "."),
     (_p("manufacturing_process.json"), "."),
     (_p("export_layout.json"), "."),
+    (_p("materail.xlsx"), "."),
 ]
 
 # ── 隐藏导入（确保 PyInstaller 完整打包这些库的所有子模块） ──
 HIDDEN = [
     "openpyxl",
     "matplotlib",
+    "material_db",
+    "app_state",
 ]
 
 # ── 明确排除 (避免 matplotlib 拖入 Qt 等) ──

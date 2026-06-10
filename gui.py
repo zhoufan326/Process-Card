@@ -22,7 +22,8 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from set import TaskGroup, Tasks, load_preset, save_preset
+from set import TaskGroup
+from app_state import AppState
 from tree_drag_controller import TreeDragController
 
 # ──────────────────────────────────────────────
@@ -134,21 +135,23 @@ def _delete_template_by_index(index: int):
 # ──────────────────────────────────────────────
 
 class TaskApp:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, app_state: AppState | None = None):
         self.root = root
+        self.state = app_state or AppState()
         self._edit_group_idx: int | None = None
         self._edit_req_idx: int = -1
-        self._poll_after_id = None
+        self._dirty = False
 
         self._init_style()
         self._build_body()
         self._build_footer()
         self._init_drag_ctrl()
         self._bind_events()
-        load_preset(DEFAULT_JSON)
+        self.state.load_tasks()
         self._refresh_tree()
         self.bay_entry.focus_set()
-        self._set_status(f"已加载 {os.path.basename(DEFAULT_JSON)} ({len(Tasks)} 组)")
+        self._update_title()
+        self._set_status("就绪")
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     # ── 全局样式 ──────────────────────────────
@@ -310,6 +313,10 @@ class TaskApp:
             wrap="word", insertbackground=CLR_ACCENT,
         )
         self.req_text.grid(row=4, column=1, columnspan=2, sticky="ew", pady=PAD_Y)
+
+        # 添加要求按钮（位于要求文本区右下方）
+        _btn(frm, "添加/修改要求", self._on_add_require, width=10).grid(
+            row=5, column=1, sticky="w", padx=(0, 14), pady=(0, 4))
         frm.grid_columnconfigure(2, weight=1)
 
     def _build_buttons(self, parent):
@@ -339,6 +346,7 @@ class TaskApp:
         ft = tk.Frame(self.root, bg=CLR_HEADER, height=30)
         ft.grid(row=1, column=0, columnspan=2, sticky="ew")
         ft.grid_propagate(False)
+        _btn(ft, "保存 (Ctrl+S)", self._save, width=14).pack(side="left", padx=8, pady=3)
         self.status_var = tk.StringVar(value="就绪")
         tk.Label(
             ft, textvariable=self.status_var, anchor="w",
@@ -365,51 +373,51 @@ class TaskApp:
         self.root.bind("<Delete>", lambda e: self._on_delete())
         self.root.bind("<Button-1>", self._on_root_click)
         self.req_text.bind("<Return>", self._on_req_enter)
+        self.root.bind("<Control-s>", lambda e: self._save())
+        self.root.bind("<Control-S>", lambda e: self._save())
 
     # ── 状态反馈 ──────────────────────────────
 
     def _set_status(self, msg: str):
         self.status_var.set(msg)
 
-    # ── 自动持久化 ────────────────────────────
+    # ── 脏标记 / 保存管理 ─────────────────────
 
-    def _auto_save(self):
-        """立即将当前表单同步到 Tasks 并持久化 manufacturing_process.json。"""
+    def _mark_dirty(self):
+        """标记数据已修改（仅同步到内存，不写文件）。"""
         self._apply_form_to_tasks()
-        save_preset(DEFAULT_JSON)
-        self._set_status("已自动保存")
+        if not self._dirty:
+            self._dirty = True
+            self._update_title()
+            self._set_status("未保存")
 
-    def _on_closing(self):
-        """关闭窗口时覆盖写入两个 JSON 文件，确保 GUI 数据持久化。"""
-        # 停止工艺计算轮询
-        if self._poll_after_id is not None:
-            self.root.after_cancel(self._poll_after_id)
-            self._poll_after_id = None
+    def _update_title(self):
+        """更新窗口标题，显示保存状态。"""
+        suffix = " ● 未保存" if self._dirty else ""
+        self.root.title(f"Process Card · 流程管理{suffix}")
 
+    def _save(self):
+        """保存所有数据到 JSON 文件。"""
+        self._apply_form_to_tasks()
+        self.state.save_tasks()                     # → manufacturing_process.json
+        self.state.save_user_params()               # → user_params.json（下次启动自动恢复）
+        # 同步 LensParams 到 field_schema.json 的 default 字段
         import json, time
         from lens_calc import _write_root
         schema_path = os.path.join(_write_root(), "field_schema.json")
-
-        # 1. 同步表单到 Tasks 并保存 manufacturing_process.json
-        self._apply_form_to_tasks()
-        save_preset(DEFAULT_JSON)
-
-        # 2. 将当前 LensParams 默认值写入 field_schema.json
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
                 schema = json.load(f)
         except (OSError, json.JSONDecodeError):
             pass
         else:
-            from lens_calc import LensParams
-            p = LensParams()
+            p = self.state.lens_params
             for section in schema.get("gui_sections", []):
                 for f in section.get("fields", []):
-                    if "attr" not in f:
-                        continue
-                    val = getattr(p, f["attr"], None)
-                    if val is not None:
-                        f["default"] = val
+                    if "attr" in f:
+                        val = getattr(p, f["attr"], None)
+                        if val is not None:
+                            f["default"] = val
             for attempt in range(3):
                 try:
                     with open(schema_path, "w", encoding="utf-8") as f:
@@ -419,7 +427,24 @@ class TaskApp:
                     if attempt < 2:
                         time.sleep(0.5)
                     continue
+        self._dirty = False
+        self._update_title()
+        self._set_status("已保存")
 
+    def _on_closing(self):
+        """关闭时检查未保存修改，询问用户。"""
+        if self._dirty:
+            resp = messagebox.askyesnocancel(
+                "未保存",
+                "当前数据尚未保存。\n\n"
+                "是(Y) — 保存后关闭\n"
+                "否(N) — 不保存直接关闭\n"
+                "取消 — 返回继续编辑")
+            if resp is None:   # 取消
+                return
+            if resp:           # 是 → 保存
+                self._save()
+        self.state.save_user_params()
         self.root.destroy()
 
     # ── 输入框操作 ────────────────────────────
@@ -445,34 +470,49 @@ class TaskApp:
     def _get_req_text(self) -> str:
         return self.req_text.get("1.0", "end-1c").strip()
 
-    # ── 实时同步：表单 → Tasks → Treeview ────
+    # ── 实时同步：表单 → tree ────
+
+    def _on_add_require(self):
+        """添加/保存要求。
+        
+        - 组模式下：将输入框文本添加为组的新要求
+        - 编辑模式下：将输入框文本保存到当前选中要求
+        """
+        if self._edit_group_idx is None:
+            messagebox.showinfo("提示", "请先选中一个工序组。")
+            return
+        text = self._get_req_text()
+        if not text:
+            return
+        g = self.state.tasks[self._edit_group_idx]
+
+        if self._edit_req_idx >= 0:
+            # 编辑模式：保存修改
+            g.requires[self._edit_req_idx] = text
+            action = "已保存"
+        else:
+            # 组模式：添加为新要求，清空文本框继续录入
+            g.requires.append(text)
+            self.req_text.delete("1.0", tk.END)
+            action = "已添加"
+
+        self._mark_dirty()
+        self._refresh_tree()
+        self._restore_selection()
+        self._set_status(f"{action}要求到组 {g.process}")
 
     def _on_root_click(self, event=None):
-        """点击任意位置时保存数据。
+        """点击非输入区域时同步表单到内存并刷新树。
         
-        - 组模式 + 有文本 + 点击输入区以外 → 添加为新要求并清空
-        - 编辑模式 → 保存修改
-        
-        点击输入控件时不刷新树（避免干扰光标），点击其他区域时刷新。"""
+        注意：Button 有独立的 command 回调，不应在此处重复处理。
+        """
         if self._edit_group_idx is not None and event is not None:
-            is_input = isinstance(event.widget, (tk.Entry, tk.Text))
-            is_group_mode = (self._edit_req_idx == -1)
-            had_text = bool(self._get_req_text())
-
-            # 先保存表单到 Tasks 和 manufacturing_process.json
-            self._auto_save()
-
-            # 组模式 + 有文本 + 点击外部 → 添加新要求
-            if is_group_mode and had_text and not is_input:
-                g = Tasks[self._edit_group_idx]
-                g.requires.append(self._get_req_text())
-                self.req_text.delete("1.0", tk.END)
-                save_preset(DEFAULT_JSON)
-
-            # 点击非输入控件时才刷新树（点击 Entry/Text 不刷新）
-            if not is_input:
-                self._refresh_tree()
-                self._restore_selection()
+            # Button 有自己的 command 回调；Entry/Text 正在编辑中
+            if isinstance(event.widget, (tk.Entry, tk.Text, tk.Button)):
+                return
+            self._apply_form_to_tasks()
+            self._refresh_tree()
+            self._restore_selection()
 
     def _restore_selection(self):
         """刷新树后恢复当前编辑项的选中高亮状态。"""
@@ -497,82 +537,40 @@ class TaskApp:
         rh_raw = self.row_height_entry.get().strip()
         req = self._get_req_text()
 
-        g = Tasks[self._edit_group_idx]
+        g = self.state.tasks[self._edit_group_idx]
         g.bay, g.process, g.obj = bay, process, obj
         g.row_height = int(rh_raw) if rh_raw.isdigit() else None
         if self._edit_req_idx >= 0 and req:
             g.requires[self._edit_req_idx] = req  # 编辑模式：保存修改
 
-    # ── 占位符解析（可失效缓存） ────────────────
+    # ── 占位符解析（委托给 state） ─────────────
 
-    _ctx_cache = None
+    def _invalidate_ctx_cache(self):
+        """清除占位符缓存。"""
+        self.state.invalidate_ctx_cache()
 
-    @classmethod
-    def _invalidate_ctx_cache(cls):
-        cls._ctx_cache = None
-        import lens_calc  # ensure module is loaded
-        import importlib, sys
-        importlib.reload(sys.modules["lens_calc"])
-
-    @classmethod
-    def _resolve_placeholders(cls, req: str) -> str:
-        """将 ${xxx} 占位符替换为 field_schema.json 默认值。"""
-        import json
-        from lens_calc import LensParams, calculate
-
-        if cls._ctx_cache is None:
-            p = LensParams()
-            r = calculate(p)
-            from lens_calc import _write_root
-            sp = os.path.join(_write_root(), "field_schema.json")
-            with open(sp, "r", encoding="utf-8") as f:
-                schema = json.load(f)
-            ctx = {}
-            for item in schema["export_ctx"]:
-                if "ctx" not in item:
-                    continue
-                src = p if item["source"] == "params" else r
-                val = getattr(src, item["attr"])
-                if item.get("hide_zero"):
-                    try:
-                        if float(val) == 0.0:
-                            ctx[item["ctx"]] = ""
-                            continue
-                    except (ValueError, TypeError):
-                        if not val:
-                            ctx[item["ctx"]] = ""
-                            continue
-                text = str(val) if item["fmt"] == "s" else format(val, item["fmt"])
-                if item.get("prefix"):
-                    text = item["prefix"] + text
-                if item.get("suffix"):
-                    text += item["suffix"]
-                ctx[item["ctx"]] = text
-            cls._ctx_cache = ctx
-
-        result = req
-        for k, v in cls._ctx_cache.items():
-            result = result.replace(k, v)
-        return result
+    def _resolve_placeholders(self, req: str) -> str:
+        """将 ${xxx} 占位符替换为当前值。"""
+        return self.state.resolve_placeholders(req)
 
     # ── 组拖拽 ────────────────────────────────
 
     def _on_move_group(self, src: int, tgt: int):
         was_edit = (self._edit_group_idx == src)
 
-        group = Tasks.pop(src)
+        group = self.state.tasks.pop(src)
 
         if self._edit_group_idx is not None and not was_edit and self._edit_group_idx > src:
             self._edit_group_idx -= 1
 
-        Tasks.insert(tgt, group)
+        self.state.tasks.insert(tgt, group)
 
         if self._edit_group_idx is not None:
             if was_edit:
                 self._edit_group_idx = tgt
             elif self._edit_group_idx >= tgt:
                 self._edit_group_idx += 1
-        self._auto_save()
+        self._mark_dirty()
         self._refresh_tree()
         self._restore_selection()
         self._set_status(f"已移动组 [{tgt + 1}] {group.process}")
@@ -582,19 +580,19 @@ class TaskApp:
         in_edit_group = (self._edit_group_idx == gi)
         was_edit_req = (in_edit_group and self._edit_req_idx == src)
 
-        req = Tasks[gi].requires.pop(src)
+        req = self.state.tasks[gi].requires.pop(src)
 
         if in_edit_group and not was_edit_req and self._edit_req_idx > src:
             self._edit_req_idx -= 1
 
-        Tasks[gi].requires.insert(tgt, req)
+        self.state.tasks[gi].requires.insert(tgt, req)
 
         if in_edit_group:
             if was_edit_req:
                 self._edit_req_idx = tgt
             elif self._edit_req_idx >= tgt:
                 self._edit_req_idx += 1
-        self._auto_save()
+        self._mark_dirty()
         self._refresh_tree()
         self._restore_selection()
         self._set_status(f"已移动要求 [{gi + 1}.{tgt + 1}] {req[:30]}…")
@@ -612,7 +610,7 @@ class TaskApp:
     def _get_group_by_item(self, item: str) -> tuple[int, int] | None:
         if not item:
             return None
-        for gi, g in enumerate(Tasks):
+        for gi, g in enumerate(self.state.tasks):
             if item == self._group_item_id(gi):
                 return (gi, -1)
             for ri in range(len(g.requires)):
@@ -630,7 +628,7 @@ class TaskApp:
 
         for item in tree.get_children():
             tree.delete(item)
-        for gi, g in enumerate(Tasks):
+        for gi, g in enumerate(self.state.tasks):
             gid = self._group_item_id(gi)
             tree.insert(
                 "", "end", iid=gid,
@@ -674,7 +672,7 @@ class TaskApp:
         if info is None:
             return
         gi, ri = info
-        g = Tasks[gi]
+        g = self.state.tasks[gi]
         if ri == -1:
             self._edit_group_idx = gi
             self._edit_req_idx = -1
@@ -696,7 +694,7 @@ class TaskApp:
 
     def _on_new(self):
         """在选中组的位置插入空白组，原组下移；无选中则追加末尾。"""
-        insert_idx = len(Tasks)
+        insert_idx = len(self.state.tasks)
         sel = self.tree.selection()
         if sel:
             info = self._get_group_by_item(sel[0])
@@ -705,15 +703,15 @@ class TaskApp:
                 insert_idx = gi  # 在选中组的位置插入，原组被挤到下一位置
 
         g = TaskGroup(bay="", process="新建工序", obj="")
-        Tasks.insert(insert_idx, g)
+        self.state.tasks.insert(insert_idx, g)
         self._edit_group_idx = insert_idx
         self._edit_req_idx = -1
         self._fill_inputs("", "新建工序", "", "", "")
-        self._auto_save()
+        self._mark_dirty()
         self._refresh_tree()
         self._restore_selection()
         self.bay_entry.focus_set()
-        self._set_status("新建组模式，填写内容后自动同步")
+        self._set_status("新建组模式，填写后请点击保存")
 
     def _on_req_enter(self, event=None):
         """Enter 键确认：编辑模式→保存修改，组模式→添加为新要求。"""
@@ -723,7 +721,7 @@ class TaskApp:
         if not text:
             return "break"
 
-        g = Tasks[self._edit_group_idx]
+        g = self.state.tasks[self._edit_group_idx]
 
         if self._edit_req_idx >= 0:
             # 编辑模式：只保存修改，不追加
@@ -733,7 +731,7 @@ class TaskApp:
             g.requires.append(text)
             self.req_text.delete("1.0", tk.END)
 
-        self._auto_save()
+        self._mark_dirty()
         self._refresh_tree()
         self._restore_selection()
         self._set_status(f"已保存到组 {g.process}")
@@ -749,12 +747,12 @@ class TaskApp:
             return
         gi, ri = info
         if ri == -1:
-            Tasks.pop(gi)
+            self.state.tasks.pop(gi)
         else:
-            Tasks[gi].requires.pop(ri)
+            self.state.tasks[gi].requires.pop(ri)
         self._edit_group_idx, self._edit_req_idx = None, -1
         self._clear_inputs()
-        self._auto_save()
+        self._mark_dirty()
         self._refresh_tree()
         self._set_status("已删除")
 
@@ -766,7 +764,7 @@ class TaskApp:
             messagebox.showinfo("提示", "请先选中一个工序组。")
             return
 
-        g = Tasks[self._edit_group_idx]
+        g = self.state.tasks[self._edit_group_idx]
         from tkinter.simpledialog import askstring
         name = askstring("保存工序", "请输入工序组名称：",
                          initialvalue=g.process,
@@ -812,7 +810,7 @@ class TaskApp:
     def _do_insert_template(self, template: dict):
         """将模板数据插入到当前位置。"""
         # 计算插入位置（与 _on_new 逻辑一致）
-        insert_idx = len(Tasks)
+        insert_idx = len(self.state.tasks)
         sel = self.tree.selection()
         if sel:
             info = self._get_group_by_item(sel[0])
@@ -827,11 +825,11 @@ class TaskApp:
             requires=list(template.get("requires", [])),
             row_height=template.get("row_height"),
         )
-        Tasks.insert(insert_idx, g)
+        self.state.tasks.insert(insert_idx, g)
         self._edit_group_idx = insert_idx
         self._edit_req_idx = -1
         self._fill_inputs(g.bay, g.process, g.obj, "", g.row_height)
-        self._auto_save()
+        self._mark_dirty()
         self._refresh_tree()
         self._restore_selection()
         self._set_status(f"已插入工序模板「{template.get('name', '')}」")
@@ -900,70 +898,36 @@ class TaskApp:
             return
         try:
             from process_card_exporter import export_process_card
-            from lens_calc import LensParams
-            p = LensParams()  # 读取 field_schema.json 中的当前值
-            result = export_process_card(filepath, lens_params=p)
+            result = export_process_card(filepath, lens_params=self.state.lens_params,
+                                         tasks=self.state.tasks)
             messagebox.showinfo("导出完成",
                                 f"工艺卡片已生成:\n{filepath}")
-            self._set_status(f"工艺卡已导出")
+            self._set_status("工艺卡已导出")
         except PermissionError:
             messagebox.showwarning("文件被占用",
                                    "导出失败，文件正在被 Excel 或其他程序打开。\n请先关闭文件再重试。")
         except Exception as e:
             import traceback
-            traceback.print_exc()   # ← 加这一行，会在终端打印完整堆栈
+            traceback.print_exc()
             messagebox.showerror("导出失败", str(e))
 
     def _on_process_calc(self):
-        """打开工艺计算窗口。返回主窗口后将检测更新并同步。"""
-        import sys as _sys
-        # ── 打包环境: 直接在同一进程打开 ──
-        if getattr(_sys, 'frozen', False):
-            try:
-                from process_planning import ProcessPlanApp
-                # 使用 Toplevel 子窗口而非 Tk()，避免 tkinter 控件路径冲突
-                calc_root = tk.Toplevel(self.root)
-                calc_root.transient(self.root)    # 设为父窗口的子窗口
-                calc_root.grab_set()              # 模态：禁止操作主窗口
-                ProcessPlanApp(calc_root)
-                self.root.wait_window(calc_root)  # 等待子窗口关闭，不阻塞主事件循环
-                # 关闭后同步：process_planning 已保存 field_schema.json，只需刷新缓存和界面
-                self._invalidate_ctx_cache()
-                self._refresh_tree()
-                self._restore_selection()
-                self._set_status("参数已同步")
-            except Exception as e:
-                messagebox.showerror("启动失败", f"无法打开工艺计算:\n{e}")
-            return
-
-        # ── 开发环境: 子进程方式 ──
-        import subprocess
-        script = os.path.join(_app_root(), "process_planning.py")
+        """打开工艺计算窗口（Toplevel 子窗口，共享 AppState）。"""
         try:
-            self._schema_mtime_before = os.path.getmtime(
-                os.path.join(_app_root(), "field_schema.json"))
-            subprocess.Popen([_sys.executable, script])
-            self._set_status("已打开工艺计算窗口（关闭后将自动同步）")
-            self.root.after(500, self._check_process_calc_closed)
+            from process_planning import ProcessPlanApp
+            calc_root = tk.Toplevel(self.root)
+            calc_root.transient(self.root)
+            calc_root.grab_set()
+            ProcessPlanApp(calc_root, app_state=self.state)
+            self.root.wait_window(calc_root)
+            # 关闭后同步
+            self._invalidate_ctx_cache()
+            self._mark_dirty()
+            self._refresh_tree()
+            self._restore_selection()
+            self._set_status("参数已同步（未保存）")
         except Exception as e:
-            messagebox.showerror("启动失败", f"无法启动工艺计算:\n{e}")
-
-    def _check_process_calc_closed(self):
-        """检测 field_schema.json mtime 变化 → 自动同步。"""
-        from lens_calc import _write_root
-        sp = os.path.join(_write_root(), "field_schema.json")
-        try:
-            mt = os.path.getmtime(sp)
-        except OSError:
-            self._poll_after_id = self.root.after(500, self._check_process_calc_closed)
-            return
-        if mt == self._schema_mtime_before:
-            self._poll_after_id = self.root.after(500, self._check_process_calc_closed)
-            return
-        self._invalidate_ctx_cache()
-        self._refresh_tree()
-        self._restore_selection()
-        self._set_status("参数已同步到显示")
+            messagebox.showerror("启动失败", f"无法打开工艺计算:\n{e}")
 
 
 # ──────────────────────────────────────────────
@@ -971,6 +935,11 @@ class TaskApp:
 # ──────────────────────────────────────────────
 
 def main():
+    """启动 Process Card 流程管理系统。
+    
+    数据默认加载 manufacturing_process.json，
+    编辑后需点击「保存」或按 Ctrl+S 持久化到 JSON 文件。
+    """
     root = tk.Tk()
     TaskApp(root)
     root.mainloop()

@@ -17,7 +17,6 @@ import openpyxl
 from openpyxl.styles import PatternFill, Alignment, Border, Side, Font
 from openpyxl.utils import get_column_letter
 
-from set import Tasks, load_preset
 from lens_calc import LensParams, CalcResult, calculate, _read_root
 
 
@@ -189,9 +188,10 @@ def _apply_all_borders(ws):
 
 
 # ═══ 主入口 ═══
-def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
+def generate_process_card(filepath: str, *, lens_params=None, calc_result=None, tasks=None):
     p = lens_params or LensParams()
     r = calc_result or calculate(p)
+    tasks = tasks or []
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = _LAYOUT.get("sheet_name", "工艺卡")
@@ -235,7 +235,7 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
 
     # ── 行13+: 工序数据（动态循环，保留原逻辑） ──
     seq, row, bf = 0, 13, {}
-    for g in Tasks:
+    for g in tasks:
         bay = g.bay.strip()
         proc = g.process.strip()
         obj = g.obj.strip() if g.obj else ""
@@ -286,10 +286,8 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None):
     return ws.max_row
 
 
-def export_process_card(filepath: str, lens_params=None, preset_path="manufacturing_process.json"):
-    if os.path.exists(preset_path):
-        load_preset(preset_path)
+def export_process_card(filepath: str, lens_params=None, tasks=None):
     p = lens_params or LensParams()
     r = calculate(p)
-    generate_process_card(filepath, lens_params=p, calc_result=r)
+    generate_process_card(filepath, lens_params=p, calc_result=r, tasks=tasks)
     return r
