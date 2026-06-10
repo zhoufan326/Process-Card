@@ -3,7 +3,7 @@
 ; 使用 ISCC.exe 编译: ISCC installer.iss
 
 #define MyAppName "Process Card"
-#define MyAppVersion "0.3.1"
+#define MyAppVersion "0.3.2"
 #define MyAppPublisher "Optic Studio"
 #define MyAppURL ""
 #define MyAppIcon "Optic_card.ico"

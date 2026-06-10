@@ -81,7 +81,12 @@ class ProcessPlanApp:
         canvas.configure(yscrollcommand=sb.set)
         canvas.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
+        # 鼠标在 canvas 区域内时滚轮滚动（离开自动解绑，避免关闭窗口后残留回调）
+        canvas.bind("<Enter>", lambda e: canvas.bind_all(
+            "<MouseWheel>", lambda e2: canvas.yview_scroll(int(-e2.delta / 120), "units")))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        # 窗口关闭时确保清理全局绑定
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         self._build_input_fields(panel)
 
@@ -108,6 +113,11 @@ class ProcessPlanApp:
         self._status = tk.StringVar(value="就绪 — 请输入参数后点击「开始计算」")
         tk.Label(bf, textvariable=self._status, font=(FONT, 9),
                  fg=CLR_SUBTEXT, bg=CLR_HEADER, anchor="e").pack(side="right", padx=16, pady=5)
+
+    def _on_closing(self):
+        """关闭窗口时清理全局绑定。"""
+        self.root.unbind_all("<MouseWheel>")
+        self.root.destroy()
 
     # ═══════════════════════════════════════════════
     #  Schema-Driven 输入面板构建

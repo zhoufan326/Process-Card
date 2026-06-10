@@ -58,6 +58,7 @@ def _app_root() -> str:
 
 PROJ_DIR = _app_root()
 DEFAULT_JSON = os.path.join(PROJ_DIR, "manufacturing_process.json")
+TEMPLATE_JSON = os.path.join(PROJ_DIR, "saved_process_templates.json")
 
 
 # ──────────────────────────────────────────────
@@ -80,6 +81,52 @@ def _sep(parent, row, colspan=2, pady=6):
     s = tk.Frame(parent, height=1, bg=CLR_BORDER)
     s.grid(row=row, column=0, columnspan=colspan, sticky="ew", padx=PAD_X, pady=pady)
     s.grid_propagate(False)
+
+
+# ── 工序模板读写 ─────────────────────────────
+
+def _load_templates() -> list[dict]:
+    """从 TEMPLATE_JSON 加载已保存的工序模板列表。"""
+    import json
+    if not os.path.isfile(TEMPLATE_JSON):
+        return []
+    try:
+        with open(TEMPLATE_JSON, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("templates", [])
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _save_template(name: str, group: TaskGroup):
+    """将工序组保存为模板（命名去重覆盖）。"""
+    import json
+    templates = _load_templates()
+    templates = [t for t in templates if t.get("name") != name]
+    entry = {
+        "name": name,
+        "bay": group.bay,
+        "process": group.process,
+        "obj": group.obj,
+        "requires": list(group.requires),
+    }
+    if group.row_height is not None:
+        entry["row_height"] = group.row_height
+    templates.append(entry)
+    data = {"templates": templates}
+    with open(TEMPLATE_JSON, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _delete_template_by_index(index: int):
+    """按索引删除模板并写回文件。"""
+    import json
+    templates = _load_templates()
+    if 0 <= index < len(templates):
+        templates.pop(index)
+    data = {"templates": templates}
+    with open(TEMPLATE_JSON, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 # ──────────────────────────────────────────────
@@ -272,12 +319,18 @@ class TaskApp:
 
         _btn(bf, "新建组", self._on_new, width=9).grid(row=0, column=0, padx=2, pady=2)
         _btn(bf, "删 除", self._on_delete, width=9).grid(row=0, column=1, padx=2, pady=2)
-
-        _btn(bf, "导出工艺卡", self._on_export, width=20).grid(
+        _btn(bf, "保存工序", self._on_save_template, width=9).grid(row=1, column=0, padx=2, pady=2)
+        self._insert_btn = _btn(bf, "插入组", self._on_insert_template, width=9)
+        self._insert_btn.grid(row=1, column=1, padx=2, pady=2)
+        _btn(bf, "管理模板", self._on_manage_templates, width=20).grid(
             row=2, column=0, columnspan=2, padx=2, pady=(6, 2), sticky="ew"
         )
+
+        _btn(bf, "导出工艺卡", self._on_export, width=20).grid(
+            row=3, column=0, columnspan=2, padx=2, pady=(6, 2), sticky="ew"
+        )
         _btn(bf, "工艺计算", self._on_process_calc, width=20).grid(
-            row=3, column=0, columnspan=2, padx=2, pady=2, sticky="ew"
+            row=4, column=0, columnspan=2, padx=2, pady=2, sticky="ew"
         )
 
     # ── 底部状态栏 ────────────────────────────
@@ -704,6 +757,135 @@ class TaskApp:
         self._auto_save()
         self._refresh_tree()
         self._set_status("已删除")
+
+    # ── 工序模板：保存与插入 ─────────────────
+
+    def _on_save_template(self):
+        """将当前选中组保存为工序模板。"""
+        if self._edit_group_idx is None:
+            messagebox.showinfo("提示", "请先选中一个工序组。")
+            return
+
+        g = Tasks[self._edit_group_idx]
+        from tkinter.simpledialog import askstring
+        name = askstring("保存工序", "请输入工序组名称：",
+                         initialvalue=g.process,
+                         parent=self.root)
+        if not name:
+            return
+
+        # 重名警告
+        existing = _load_templates()
+        if any(t.get("name") == name for t in existing):
+            if not messagebox.askyesno("确认覆盖",
+                    f"已存在同名工序「{name}」，是否覆盖？",
+                    parent=self.root):
+                return
+
+        _save_template(name, g)
+        self._set_status(f"工序「{name}」已保存")
+
+    def _on_insert_template(self):
+        """弹出下拉菜单选择已保存的工序模板，在当前位置插入。"""
+        templates = _load_templates()
+        if not templates:
+            messagebox.showinfo("提示", "暂无已保存的工序模板。\n请先选中工序组，点击「保存工序」。")
+            return
+
+        # 创建弹出菜单
+        popup = tk.Menu(self.root, tearoff=False,
+                        font=(FONT, 10),
+                        bg=CLR_PANEL, fg=CLR_TEXT,
+                        activebackground=CLR_ACCENT, activeforeground="white")
+
+        for t in templates:
+            name = t.get("name", "未命名")
+            popup.add_command(label=name,
+                              command=lambda tpl=t: self._do_insert_template(tpl))
+
+        # 在"插入组"按钮下方弹出
+        btn = self._insert_btn
+        x = btn.winfo_rootx()
+        y = btn.winfo_rooty() + btn.winfo_height()
+        popup.tk_popup(x, y)
+
+    def _do_insert_template(self, template: dict):
+        """将模板数据插入到当前位置。"""
+        # 计算插入位置（与 _on_new 逻辑一致）
+        insert_idx = len(Tasks)
+        sel = self.tree.selection()
+        if sel:
+            info = self._get_group_by_item(sel[0])
+            if info is not None:
+                gi, _ = info
+                insert_idx = gi
+
+        g = TaskGroup(
+            bay=template.get("bay", ""),
+            process=template.get("process", "工序"),
+            obj=template.get("obj", ""),
+            requires=list(template.get("requires", [])),
+            row_height=template.get("row_height"),
+        )
+        Tasks.insert(insert_idx, g)
+        self._edit_group_idx = insert_idx
+        self._edit_req_idx = -1
+        self._fill_inputs(g.bay, g.process, g.obj, "", g.row_height)
+        self._auto_save()
+        self._refresh_tree()
+        self._restore_selection()
+        self._set_status(f"已插入工序模板「{template.get('name', '')}」")
+
+    def _on_manage_templates(self):
+        """打开模板管理窗口，可查看和删除已保存的工序模板。"""
+        templates = _load_templates()
+        if not templates:
+            messagebox.showinfo("提示", "暂无已保存的工序模板。")
+            return
+
+        # 创建子窗口
+        win = tk.Toplevel(self.root)
+        win.title("管理工序模板")
+        win.geometry("440x360")
+        win.configure(bg=CLR_PAPER)
+        win.transient(self.root)
+        win.grab_set()
+
+        tk.Label(win, text="已保存的工序模板：", font=(FONT, 10, "bold"),
+                 fg=CLR_ACCENT, bg=CLR_PAPER, anchor="w"
+                 ).pack(fill="x", padx=14, pady=(10, 4))
+
+        # 列表区域
+        frm = tk.Frame(win, bg="white",
+                       highlightbackground=CLR_BORDER, highlightthickness=1)
+        frm.pack(fill="both", expand=True, padx=14, pady=4)
+        frm.grid_columnconfigure(1, weight=1)
+
+        labels = []
+        for i, t in enumerate(templates):
+            name = t.get("name", "未命名")
+            process = t.get("process", "")
+            detail = f"{name}（{process}）"
+
+            tk.Label(frm, text=detail, font=(FONT, 9), fg=CLR_TEXT, bg="white",
+                     anchor="w").grid(row=i, column=0, sticky="ew", padx=(8, 4), pady=3)
+
+            def _del(idx=i):
+                _delete_template_by_index(idx)
+                win.destroy()
+                self._set_status("模板已删除")
+
+            tk.Button(frm, text="删除", command=_del,
+                      font=(FONT, 8), fg="white", bg="#c0392b",
+                      relief="flat", cursor="hand2", bd=0, padx=8, pady=1
+                      ).grid(row=i, column=1, padx=(4, 8), pady=3)
+
+            labels.append(detail)
+
+        tk.Button(win, text="关闭", command=win.destroy,
+                  font=(FONT, 9), bg=CLR_ACCENT, fg="white",
+                  relief="flat", cursor="hand2", bd=0, padx=12, pady=3
+                  ).pack(pady=(4, 10))
 
     # ── 导出工艺卡 / 工艺计算 ────────────────
 
