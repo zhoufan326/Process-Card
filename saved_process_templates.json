@@ -1,0 +1,26 @@
+{
+  "templates": [
+    {
+      "name": "抛光",
+      "bay": "球面",
+      "process": "抛光",
+      "obj": "S1",
+      "requires": [
+        "CA：＞Φ${CA_S1_strict}（加严）",
+        "${N_S1} ${IRR_S1} ${RMS_S1}",
+        "控制曲率范围（${r1_lower}～${r1_upper}）",
+        "粗糙度：＜${roughness_s1}",
+        "S/D：${SD_S1}"
+      ]
+    },
+    {
+      "name": "精磨",
+      "bay": "球面",
+      "process": "精磨",
+      "obj": "S2",
+      "requires": [
+        "精磨S2面，控制中心厚度${tc_polish2}+${polishing_s2}+${tc_tol}"
+      ]
+    }
+  ]
+}

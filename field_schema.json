@@ -9,7 +9,7 @@
           "attr": "material",
           "label": "透镜材料",
           "type": "str",
-          "default": "Corning 7980 ArF 0F",
+          "default": "Corning 7980 ArF 0C",
           "_comment": "材料牌号"
         },
         {
@@ -17,7 +17,7 @@
           "label": "R1 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 58.0,
+          "default": 21.775,
           "_comment": "第1面曲率半径"
         },
         {
@@ -25,7 +25,7 @@
           "label": "R2 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 24.944,
+          "default": 36.106,
           "_comment": "第2面曲率半径"
         },
         {
@@ -33,7 +33,7 @@
           "label": "外径 D",
           "unit": "mm",
           "type": "float",
-          "default": 15.0,
+          "default": 14.0,
           "_comment": "透镜成品外径"
         },
         {
@@ -41,7 +41,7 @@
           "label": "中心厚度 Tc",
           "unit": "mm",
           "type": "float",
-          "default": 2.42,
+          "default": 4.0,
           "_comment": "透镜中心厚度"
         },
         {
@@ -70,7 +70,7 @@
           "label": "Tc 公差",
           "unit": "mm",
           "type": "float",
-          "default": 0.03,
+          "default": 0.02,
           "_comment": "中心厚度加工公差"
         },
         {
@@ -108,7 +108,7 @@
           "label": "S1面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 0.1,
+          "default": 0.2,
           "_comment": "S1面铣磨材料去除量"
         },
         {
@@ -116,7 +116,7 @@
           "label": "S2面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 0.1,
+          "default": 0.2,
           "_comment": "S2面铣磨材料去除量"
         },
         {
@@ -124,7 +124,7 @@
           "label": "S1精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.14,
+          "default": 0.2,
           "_comment": "S1面精磨+抛光总去除量"
         },
         {
@@ -132,7 +132,7 @@
           "label": "S2精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.14,
+          "default": 0.2,
           "_comment": "S2面精磨+抛光总去除量"
         }
       ]
@@ -153,7 +153,7 @@
           "label": "S1 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.15,
+          "default": 0.2,
           "_comment": "S1面局部光圈不规则度"
         },
         {
@@ -168,7 +168,7 @@
           "label": "S2 IRR",
           "unit": "λ",
           "type": "float",
-          "default": 0.15,
+          "default": 0.2,
           "_comment": "S2面局部光圈不规则度"
         },
         {
@@ -192,7 +192,7 @@
           "label": "粗糙度 S1",
           "unit": "nm",
           "type": "float",
-          "default": 1.0,
+          "default": 0.8,
           "_comment": "S1面粗糙度要求"
         },
         {
@@ -200,7 +200,7 @@
           "label": "粗糙度 S2",
           "unit": "nm",
           "type": "float",
-          "default": 1.0,
+          "default": 0.8,
           "_comment": "S2面粗糙度要求"
         }
       ]
@@ -220,14 +220,14 @@
           "attr": "drawing_no",
           "label": "图号",
           "type": "str",
-          "default": "M0292-G03",
+          "default": "M0523-G02",
           "_comment": "设计图号"
         },
         {
           "attr": "card_no",
           "label": "工艺卡号",
           "type": "str",
-          "default": "NQ0658",
+          "default": "NQ0955",
           "_comment": "工艺卡片编号"
         },
         {
@@ -276,7 +276,7 @@
           "label": "S1 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 13.0,
+          "default": 12.0,
           "_comment": "S1面有效检测口径"
         },
         {
@@ -284,7 +284,7 @@
           "label": "S2 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 13.0,
+          "default": 12.0,
           "_comment": "S2面有效检测口径"
         },
         {
@@ -306,7 +306,7 @@
           "attr": "coating_spec",
           "label": "镀膜指标",
           "type": "str",
-          "default": "S1、S2：AR-193.368nm，R＜0.5%@193.368nm，AOI=0°±35°",
+          "default": "S1、S2：AR-193.368nm，R＜0.5%@193.368nm，AOI=0°±11°",
           "_comment": "镀膜规格要求"
         },
         {
@@ -314,7 +314,7 @@
           "label": "透射偏心 S1",
           "unit": "′",
           "type": "float",
-          "default": 1.0,
+          "default": 2.0,
           "_comment": "S1面透射偏心允许值（arcmin）"
         },
         {
@@ -322,7 +322,7 @@
           "label": "透射偏心 S2",
           "unit": "′",
           "type": "float",
-          "default": 1.0,
+          "default": 2.0,
           "_comment": "S2面透射偏心允许值（arcmin）"
         }
       ]
@@ -445,14 +445,14 @@
       "ctx": "${roughness_s1}",
       "source": "params",
       "attr": "roughness_s1",
-      "fmt": ".0f",
+      "fmt": ".1f",
       "suffix": "nm"
     },
     {
       "ctx": "${roughness_s2}",
       "source": "params",
       "attr": "roughness_s2",
-      "fmt": ".0f",
+      "fmt": ".1f",
       "suffix": "nm"
     },
     {
@@ -477,13 +477,15 @@
       "ctx": "${CA_S1_strict}",
       "source": "result",
       "attr": "s1_ca_strict",
-      "fmt": ".1f"
+      "fmt": ".1f",
+      "label": "S1 加严 CA"
     },
     {
       "ctx": "${CA_S2_strict}",
       "source": "result",
       "attr": "s2_ca_strict",
-      "fmt": ".1f"
+      "fmt": ".1f",
+      "label": "S2 加严 CA"
     },
     {
       "_comment": "加工去除量"
@@ -522,7 +524,8 @@
       "ctx": "${focal}",
       "source": "result",
       "attr": "focal_length",
-      "fmt": ".0f"
+      "fmt": ".0f",
+      "label": "焦距 f"
     },
     {
       "_comment": "下料 / 毛坯尺寸"
@@ -531,13 +534,15 @@
       "ctx": "${blank_d}",
       "source": "result",
       "attr": "blank_diameter",
-      "fmt": ".1f"
+      "fmt": ".1f",
+      "label": "毛坯外径"
     },
     {
       "ctx": "${blank_t}",
       "source": "result",
       "attr": "blank_thickness",
-      "fmt": ".3f"
+      "fmt": ".3f",
+      "label": "毛坯厚度"
     },
     {
       "_comment": "各工序后的中心厚度"
@@ -546,25 +551,29 @@
       "ctx": "${tc_mill1}",
       "source": "result",
       "attr": "tc_after_mill_s1",
-      "fmt": ".3f"
+      "fmt": ".3f",
+      "label": "铣磨S1后中厚"
     },
     {
       "ctx": "${tc_mill2}",
       "source": "result",
       "attr": "tc_after_mill_s2",
-      "fmt": ".3f"
+      "fmt": ".3f",
+      "label": "铣磨S2后中厚"
     },
     {
       "ctx": "${tc_polish1}",
       "source": "result",
       "attr": "tc_after_grinding_s1",
-      "fmt": ".3f"
+      "fmt": ".3f",
+      "label": "抛光S1后中厚"
     },
     {
       "ctx": "${tc_polish2}",
       "source": "result",
       "attr": "tc_after_grinding_s2",
-      "fmt": ".3f"
+      "fmt": ".3f",
+      "label": "抛光S2后中厚"
     },
     {
       "_comment": "精磨量 / 抛光量（由精磨抛光总量拆分）"
@@ -573,25 +582,29 @@
       "ctx": "${grinding_s1}",
       "source": "result",
       "attr": "grinding_s1",
-      "fmt": ".2f"
+      "fmt": ".2f",
+      "label": "S1 精磨量"
     },
     {
       "ctx": "${grinding_s2}",
       "source": "result",
       "attr": "grinding_s2",
-      "fmt": ".2f"
+      "fmt": ".2f",
+      "label": "S2 精磨量"
     },
     {
       "ctx": "${polishing_s1}",
       "source": "result",
       "attr": "polishing_s1",
-      "fmt": ".2f"
+      "fmt": ".2f",
+      "label": "S1 抛光量"
     },
     {
       "ctx": "${polishing_s2}",
       "source": "result",
       "attr": "polishing_s2",
-      "fmt": ".2f"
+      "fmt": ".2f",
+      "label": "S2 抛光量"
     },
     {
       "_comment": "曲率半径公差范围"
@@ -600,25 +613,29 @@
       "ctx": "${r1_upper}",
       "source": "result",
       "attr": "r1_upper",
-      "fmt": ".4f"
+      "fmt": ".4f",
+      "label": "R1 上限"
     },
     {
       "ctx": "${r1_lower}",
       "source": "result",
       "attr": "r1_lower",
-      "fmt": ".4f"
+      "fmt": ".4f",
+      "label": "R1 下限"
     },
     {
       "ctx": "${r2_upper}",
       "source": "result",
       "attr": "r2_upper",
-      "fmt": ".4f"
+      "fmt": ".4f",
+      "label": "R2 上限"
     },
     {
       "ctx": "${r2_lower}",
       "source": "result",
       "attr": "r2_lower",
-      "fmt": ".4f"
+      "fmt": ".4f",
+      "label": "R2 下限"
     },
     {
       "_comment": "偏心 / 面倾斜"
@@ -642,19 +659,235 @@
       "ctx": "${edge_thick}",
       "source": "result",
       "attr": "edge_thick_diff_s1",
-      "fmt": ".3f"
+      "fmt": ".3f",
+      "label": "边厚差"
     },
     {
       "ctx": "${sag_s1}",
       "source": "result",
       "attr": "sag_s1",
-      "fmt": ".4f"
+      "fmt": ".4f",
+      "label": "S1 矢高"
     },
     {
       "ctx": "${sag_s2}",
       "source": "result",
       "attr": "sag_s2",
-      "fmt": ".4f"
+      "fmt": ".4f",
+      "label": "S2 矢高"
+    },
+    {
+      "_comment": "后焦距"
+    },
+    {
+      "ctx": "${bfl_s1}",
+      "source": "result",
+      "attr": "back_focal_s1",
+      "fmt": ".2f",
+      "label": "后焦距 BFL_S1"
+    },
+    {
+      "ctx": "${bfl_s2}",
+      "source": "result",
+      "attr": "back_focal_s2",
+      "fmt": ".2f",
+      "label": "后焦距 BFL_S2"
+    },
+    {
+      "_comment": "矢高差/最大矢高/R最大值"
+    },
+    {
+      "ctx": "${sag_diff_s1}",
+      "source": "result",
+      "attr": "sag_diff_s1",
+      "fmt": ".6f",
+      "label": "S1 矢高差"
+    },
+    {
+      "ctx": "${sag_diff_s2}",
+      "source": "result",
+      "attr": "sag_diff_s2",
+      "fmt": ".6f",
+      "label": "S2 矢高差"
+    },
+    {
+      "ctx": "${sag_max_s1}",
+      "source": "result",
+      "attr": "sag_max_s1",
+      "fmt": ".6f",
+      "label": "S1 最大矢高"
+    },
+    {
+      "ctx": "${sag_max_s2}",
+      "source": "result",
+      "attr": "sag_max_s2",
+      "fmt": ".6f",
+      "label": "S2 最大矢高"
+    },
+    {
+      "ctx": "${r_max_s1}",
+      "source": "result",
+      "attr": "r_max_s1",
+      "fmt": ".4f",
+      "label": "R1 最大值(矢高反推)"
+    },
+    {
+      "ctx": "${r_max_s2}",
+      "source": "result",
+      "attr": "r_max_s2",
+      "fmt": ".4f",
+      "label": "R2 最大值(矢高反推)"
+    },
+    {
+      "_comment": "样板精度 / ΔR"
+    },
+    {
+      "ctx": "${sample_precision_r1}",
+      "source": "result",
+      "attr": "r1_sample_precision",
+      "fmt": ".1f",
+      "suffix": "µm",
+      "label": "R1 A级样板精度"
+    },
+    {
+      "ctx": "${sample_precision_r2}",
+      "source": "result",
+      "attr": "r2_sample_precision",
+      "fmt": ".1f",
+      "suffix": "µm",
+      "label": "R2 A级样板精度"
+    },
+    {
+      "ctx": "${dr_with_sample_r1}",
+      "source": "result",
+      "attr": "r1_dr_with_sample",
+      "fmt": ".4f",
+      "label": "R1 ΔR(含样板)"
+    },
+    {
+      "ctx": "${dr_with_sample_r2}",
+      "source": "result",
+      "attr": "r2_dr_with_sample",
+      "fmt": ".4f",
+      "label": "R2 ΔR(含样板)"
+    },
+    {
+      "ctx": "${dr_no_sample_r1}",
+      "source": "result",
+      "attr": "r1_dr_no_sample",
+      "fmt": ".4f",
+      "label": "R1 ΔR(不含样板)"
+    },
+    {
+      "ctx": "${dr_no_sample_r2}",
+      "source": "result",
+      "attr": "r2_dr_no_sample",
+      "fmt": ".4f",
+      "label": "R2 ΔR(不含样板)"
+    },
+    {
+      "_comment": "实际上下限文字（小R值用µm，大R值用mm）"
+    },
+    {
+      "ctx": "${r1_actual_upper}",
+      "source": "result",
+      "attr": "r1_actual_upper",
+      "fmt": "s",
+      "label": "R1 实际显示上限"
+    },
+    {
+      "ctx": "${r1_actual_lower}",
+      "source": "result",
+      "attr": "r1_actual_lower",
+      "fmt": "s",
+      "label": "R1 实际显示下限"
+    },
+    {
+      "ctx": "${r2_actual_upper}",
+      "source": "result",
+      "attr": "r2_actual_upper",
+      "fmt": "s",
+      "label": "R2 实际显示上限"
+    },
+    {
+      "ctx": "${r2_actual_lower}",
+      "source": "result",
+      "attr": "r2_actual_lower",
+      "fmt": "s",
+      "label": "R2 实际显示下限"
+    },
+    {
+      "_comment": "偏心 / 面倾斜（计算输出）"
+    },
+    {
+      "ctx": "${tilt_per_mm_s1}",
+      "source": "result",
+      "attr": "tilt_s1_per_mm",
+      "fmt": ".2f",
+      "label": "S1 面倾斜(' /mm)"
+    },
+    {
+      "ctx": "${tilt_per_mm_s2}",
+      "source": "result",
+      "attr": "tilt_s2_per_mm",
+      "fmt": ".2f",
+      "label": "S2 面倾斜(' /mm)"
+    },
+    {
+      "ctx": "${decent_per_tilt_s1}",
+      "source": "result",
+      "attr": "decent_s1_per_tilt",
+      "fmt": ".5f",
+      "label": "S1 偏心差(mm/@1′)"
+    },
+    {
+      "ctx": "${decent_per_tilt_s2}",
+      "source": "result",
+      "attr": "decent_s2_per_tilt",
+      "fmt": ".5f",
+      "label": "S2 偏心差(mm/@1′)"
+    },
+    {
+      "ctx": "${sphere_center_s1}",
+      "source": "result",
+      "attr": "sphere_center_s1",
+      "fmt": ".4f",
+      "label": "S1 球心距(mm/@1′)"
+    },
+    {
+      "ctx": "${sphere_center_s2}",
+      "source": "result",
+      "attr": "sphere_center_s2",
+      "fmt": ".4f",
+      "label": "S2 球心距(mm/@1′)"
+    },
+    {
+      "ctx": "${reflect_center_s1}",
+      "source": "result",
+      "attr": "reflect_center_s1",
+      "fmt": ".6f",
+      "label": "S1 反射球心距"
+    },
+    {
+      "ctx": "${reflect_center_s2}",
+      "source": "result",
+      "attr": "reflect_center_s2",
+      "fmt": ".6f",
+      "label": "S2 反射球心距"
+    },
+    {
+      "ctx": "${tilt_from_center_s1}",
+      "source": "result",
+      "attr": "tilt_from_center_s1",
+      "fmt": ".2f",
+      "label": "S1 面倾斜反算(')"
+    },
+    {
+      "ctx": "${tilt_from_center_s2}",
+      "source": "result",
+      "attr": "tilt_from_center_s2",
+      "fmt": ".2f",
+      "label": "S2 面倾斜反算(')"
     },
     {
       "_comment": "倒角规格"

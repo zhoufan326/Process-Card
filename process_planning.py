@@ -48,6 +48,7 @@ class ProcessPlanApp:
         self._params = self.state.lens_params
         self._material_dict, self._material_list = material_db.load_materials()
         self._last_result = None
+        self._destroyed = False
         self._build_ui()
         self._on_calculate()
 
@@ -86,12 +87,21 @@ class ProcessPlanApp:
         sb.pack(side="right", fill="y")
         # 鼠标在 canvas 区域内时滚轮滚动（离开自动解绑，避免关闭窗口后残留回调）
         canvas.bind("<Enter>", lambda e: canvas.bind_all(
-            "<MouseWheel>", lambda e2: canvas.yview_scroll(int(-e2.delta / 120), "units")))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+            "<MouseWheel>", lambda e2: self._on_canvas_scroll(e2, canvas)))
+        canvas.bind("<Leave>", lambda e: self.root.unbind_all("<MouseWheel>"))
         # 窗口关闭时确保清理全局绑定
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         self._build_input_fields(panel)
+
+    def _on_canvas_scroll(self, event, canvas):
+        """Canvas 滚轮滚动，带控件销毁保护。"""
+        if self._destroyed:
+            return
+        try:
+            canvas.yview_scroll(int(-event.delta / 120), "units")
+        except tk.TclError:
+            pass
 
     def _build_result_panel(self, parent):
         right = tk.Frame(parent, bg=CLR_PANEL, highlightbackground=CLR_BORDER, highlightthickness=1)
@@ -118,9 +128,20 @@ class ProcessPlanApp:
                  fg=CLR_SUBTEXT, bg=CLR_HEADER, anchor="e").pack(side="right", padx=16, pady=5)
 
     def _on_closing(self):
-        """关闭窗口时清理全局绑定。"""
-        self.root.unbind_all("<MouseWheel>")
-        self.root.destroy()
+        """关闭窗口时清理全局绑定并释放 grab。"""
+        self._destroyed = True
+        try:
+            self.root.unbind_all("<MouseWheel>")
+        except tk.TclError:
+            pass
+        try:
+            self.root.grab_release()
+        except tk.TclError:
+            pass
+        try:
+            self.root.destroy()
+        except tk.TclError:
+            pass
 
     # ═══════════════════════════════════════════════
     #  Schema-Driven 输入面板构建
@@ -190,27 +211,42 @@ class ProcessPlanApp:
                     continue
                 _add_field(f["attr"], f["label"], f.get("unit", ""))
 
-        # ── 上下键快速切换输入框 ──
+        # ── 上下键快速切换输入框（排除 Combobox，避免与下拉菜单冲突） ──
         self._entry_order = []
         for section in SCHEMA["gui_sections"]:
             for f in section["fields"]:
-                if "attr" in f and f["attr"] in self._entries:
-                    self._entry_order.append(self._entries[f["attr"]])
+                if "attr" not in f or f["attr"] not in self._entries:
+                    continue
+                w = self._entries[f["attr"]]
+                if isinstance(w, ttk.Combobox):
+                    continue
+                self._entry_order.append(w)
 
         def _nav(delta):
-            """delta=+1 向下, delta=-1 向上"""
-            focused = self.root.focus_get()
+            """delta=+1 向下, delta=-1 向上，带控件销毁保护。"""
+            if self._destroyed:
+                return
+            try:
+                focused = self.root.focus_get()
+            except tk.TclError:
+                return
             for i, w in enumerate(self._entry_order):
                 if w == focused:
                     target = (i + delta) % len(self._entry_order)
-                    self._entry_order[target].focus_set()
+                    try:
+                        self._entry_order[target].focus_set()
+                    except tk.TclError:
+                        pass
                     return
             # 无焦点时默认聚焦第一个
-            self._entry_order[0].focus_set()
+            try:
+                self._entry_order[0].focus_set()
+            except tk.TclError:
+                pass
 
         for w in self._entry_order:
-            w.bind("<Down>", lambda e: _nav(+1), add="+")
-            w.bind("<Up>", lambda e: _nav(-1), add="+")
+            w.bind("<Down>", lambda e, d=+1: _nav(d), add="+")
+            w.bind("<Up>", lambda e, d=-1: _nav(d), add="+")
 
         # 初始同步：默认材料 → 折射率
         self._on_material_changed()
@@ -219,17 +255,25 @@ class ProcessPlanApp:
 
     def _on_material_changed(self, event=None):
         """材料下拉选择或手动输入后，自动查询并填入折射率 n。"""
+        if self._destroyed:
+            return
         if "material" not in self._entries or "n" not in self._entries:
             return
-        name = self._entries["material"].get().strip()
+        try:
+            name = self._entries["material"].get().strip()
+        except tk.TclError:
+            return
         n_val = self._material_dict.get(name)
         if n_val is not None and n_val > 0:
             n_ent = self._entries["n"]
-            old = n_ent.get().strip()
-            new = str(n_val)
-            if old != new:
-                n_ent.delete(0, "end")
-                n_ent.insert(0, new)
+            try:
+                old = n_ent.get().strip()
+                new = str(n_val)
+                if old != new:
+                    n_ent.delete(0, "end")
+                    n_ent.insert(0, new)
+            except tk.TclError:
+                pass
 
     # ═══════════════════════════════════════════════
     #  应用按钮 → 永久保存到 field_schema.json

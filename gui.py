@@ -84,6 +84,42 @@ def _sep(parent, row, colspan=2, pady=6):
     s.grid_propagate(False)
 
 
+def _safe_close_modal(win, parent=None):
+    """安全关闭模态子窗口：先释放 grab，再销毁窗口，最后让父窗口获取焦点。
+
+    所有使用 grab_set() 的子窗口**必须**通过此函数关闭，否则主窗口会卡死。
+    """
+    try:
+        win.grab_release()
+    except tk.TclError:
+        pass
+    try:
+        win.destroy()
+    except tk.TclError:
+        pass
+    if parent is not None:
+        try:
+            parent.focus_set()
+        except tk.TclError:
+            pass
+
+
+def _make_modal(win, parent):
+    """将 Toplevel 设为模态子窗口，并设置安全的关闭协议。
+
+    创建子窗口后调用此函数代替手动 grab_set()，可确保所有关闭路径都正确释放 grab。
+    返回 safe_close 函数，子窗口内部需要关闭时直接调用 safe_close() 即可。
+    """
+    win.transient(parent)
+
+    def safe_close():
+        _safe_close_modal(win, parent)
+
+    win.protocol("WM_DELETE_WINDOW", safe_close)
+    win.grab_set()
+    return safe_close
+
+
 # ── 工序模板读写 ─────────────────────────────
 
 def _load_templates() -> list[dict]:
@@ -317,6 +353,8 @@ class TaskApp:
         # 添加要求按钮（位于要求文本区右下方）
         _btn(frm, "添加/修改要求", self._on_add_require, width=10).grid(
             row=5, column=1, sticky="w", padx=(0, 14), pady=(0, 4))
+        _btn(frm, "占位符", self._on_insert_placeholder, width=8).grid(
+            row=5, column=2, sticky="w", padx=(0, 14), pady=(0, 4))
         frm.grid_columnconfigure(2, weight=1)
 
     def _build_buttons(self, parent):
@@ -552,6 +590,142 @@ class TaskApp:
     def _resolve_placeholders(self, req: str) -> str:
         """将 ${xxx} 占位符替换为当前值。"""
         return self.state.resolve_placeholders(req)
+
+    # ── 占位符快速插入 ────────────────────────
+
+    def _load_placeholder_map(self) -> list[tuple[str, str]]:
+        """从 field_schema.json 加载占位符 → 中文标签 映射。"""
+        import json
+        from lens_calc import _read_root
+        path = os.path.join(_read_root(), "field_schema.json")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                schema = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return []
+
+        # attr → 中文标签（来自 gui_sections）
+        attr_to_label = {}
+        for section in schema.get("gui_sections", []):
+            for field in section.get("fields", []):
+                if "attr" in field:
+                    attr_to_label[field["attr"]] = field.get("label", field["attr"])
+
+        # 遍历 export_ctx，收集 (占位符, 描述) 列表
+        placeholders: list[tuple[str, str]] = []
+        for item in schema.get("export_ctx", []):
+            if "ctx" not in item:
+                continue
+            ctx = item["ctx"]
+            attr = item.get("attr", "")
+            # 优先用 gui_sections 中的中文标签，其次用 export_ctx 自身的 label，最后用 attr 名
+            label = attr_to_label.get(attr) or item.get("label") or attr
+            placeholders.append((ctx, label))
+
+        # 按标签排序
+        placeholders.sort(key=lambda x: x[1])
+        return placeholders
+
+    def _on_insert_placeholder(self):
+        """弹窗显示所有可用占位符，点击后插入到「要求」文本框光标处。"""
+        placeholders = self._load_placeholder_map()
+        if not placeholders:
+            messagebox.showinfo("提示", "未找到可用占位符。\n请检查 field_schema.json 是否存在。")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("选择指标占位符")
+        win.geometry("520x480")
+        win.configure(bg=CLR_PAPER)
+        safe_close = _make_modal(win, self.root)
+
+        # 标题
+        tk.Label(win, text="点击占位符即可插入到「要求」文本框当前光标位置：",
+                 font=(FONT, 10), fg=CLR_SUBTEXT, bg=CLR_PAPER, anchor="w"
+                 ).pack(fill="x", padx=14, pady=(10, 4))
+
+        # 搜索框
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(win, textvariable=search_var, font=(FONT, 10),
+                                bg="white", fg=CLR_TEXT, relief="solid", bd=1)
+        search_entry.pack(fill="x", padx=14, pady=(0, 6))
+        search_entry.focus_set()
+
+        # 列表容器
+        container = tk.Frame(win, bg="white",
+                             highlightbackground=CLR_BORDER, highlightthickness=1)
+        container.pack(fill="both", expand=True, padx=14, pady=4)
+
+        canvas = tk.Canvas(container, bg="white", highlightthickness=0)
+        sb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        list_frame = tk.Frame(canvas, bg="white")
+        list_frame.bind("<Configure>",
+                        lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=list_frame, anchor="nw")
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+
+        def _rebuild(keyword: str):
+            keyword = keyword.lower()
+            for w in list_frame.winfo_children():
+                w.destroy()
+            for ctx, label in placeholders:
+                if keyword and keyword not in ctx.lower() and keyword not in label.lower():
+                    continue
+                _create_item(ctx, label)
+
+        def _create_item(ctx: str, label: str):
+            frm = tk.Frame(list_frame, bg="white", cursor="hand2")
+            frm.pack(fill="x", padx=4, pady=1)
+
+            ctx_lbl = tk.Label(frm, text=ctx, font=(FONT, 9, "bold"),
+                               fg=CLR_ACCENT, bg="white", anchor="w", width=28)
+            ctx_lbl.pack(side="left", padx=(8, 4))
+
+            desc_lbl = tk.Label(frm, text=label, font=(FONT, 9),
+                                fg=CLR_SUBTEXT, bg="white", anchor="w")
+            desc_lbl.pack(side="left", fill="x", expand=True)
+
+            # 分割线
+            sep = tk.Frame(frm, height=1, bg=CLR_BORDER)
+            sep.pack(fill="x", side="bottom")
+
+            def _on_enter(_e):
+                for w in (frm, ctx_lbl, desc_lbl):
+                    w.configure(bg=CLR_TREE_SEL)
+
+            def _on_leave(_e):
+                for w in (frm, ctx_lbl, desc_lbl):
+                    w.configure(bg="white")
+
+            def _on_click(_e):
+                self._insert_to_req_text(ctx)
+                safe_close()
+
+            for w in (frm, ctx_lbl, desc_lbl):
+                w.bind("<Enter>", _on_enter)
+                w.bind("<Leave>", _on_leave)
+                w.bind("<Button-1>", _on_click)
+
+        def _on_search(*_):
+            _rebuild(search_var.get())
+
+        search_var.trace_add("write", _on_search)
+        _rebuild("")
+
+        # 底部提示
+        tk.Label(win, text="提示：输入关键词可快速筛选占位符",
+                 font=(FONT, 8), fg=CLR_SUBTEXT, bg=CLR_PAPER, anchor="w"
+                 ).pack(fill="x", padx=14, pady=(4, 8))
+
+    def _insert_to_req_text(self, placeholder: str):
+        """在要求文本框光标处插入占位符。"""
+        try:
+            self.req_text.insert("insert", placeholder)
+            self.req_text.focus_set()
+        except tk.TclError:
+            pass
 
     # ── 组拖拽 ────────────────────────────────
 
@@ -841,25 +1015,21 @@ class TaskApp:
             messagebox.showinfo("提示", "暂无已保存的工序模板。")
             return
 
-        # 创建子窗口
         win = tk.Toplevel(self.root)
         win.title("管理工序模板")
         win.geometry("440x360")
         win.configure(bg=CLR_PAPER)
-        win.transient(self.root)
-        win.grab_set()
+        safe_close = _make_modal(win, self.root)
 
         tk.Label(win, text="已保存的工序模板：", font=(FONT, 10, "bold"),
                  fg=CLR_ACCENT, bg=CLR_PAPER, anchor="w"
                  ).pack(fill="x", padx=14, pady=(10, 4))
 
-        # 列表区域
         frm = tk.Frame(win, bg="white",
                        highlightbackground=CLR_BORDER, highlightthickness=1)
         frm.pack(fill="both", expand=True, padx=14, pady=4)
         frm.grid_columnconfigure(1, weight=1)
 
-        labels = []
         for i, t in enumerate(templates):
             name = t.get("name", "未命名")
             process = t.get("process", "")
@@ -870,17 +1040,15 @@ class TaskApp:
 
             def _del(idx=i):
                 _delete_template_by_index(idx)
-                win.destroy()
                 self._set_status("模板已删除")
+                safe_close()
 
             tk.Button(frm, text="删除", command=_del,
                       font=(FONT, 8), fg="white", bg="#c0392b",
                       relief="flat", cursor="hand2", bd=0, padx=8, pady=1
                       ).grid(row=i, column=1, padx=(4, 8), pady=3)
 
-            labels.append(detail)
-
-        tk.Button(win, text="关闭", command=win.destroy,
+        tk.Button(win, text="关闭", command=safe_close,
                   font=(FONT, 9), bg=CLR_ACCENT, fg="white",
                   relief="flat", cursor="hand2", bd=0, padx=12, pady=3
                   ).pack(pady=(4, 10))
@@ -913,21 +1081,24 @@ class TaskApp:
 
     def _on_process_calc(self):
         """打开工艺计算窗口（Toplevel 子窗口，共享 AppState）。"""
+        from process_planning import ProcessPlanApp
+        calc_root = tk.Toplevel(self.root)
         try:
-            from process_planning import ProcessPlanApp
-            calc_root = tk.Toplevel(self.root)
-            calc_root.transient(self.root)
-            calc_root.grab_set()
             ProcessPlanApp(calc_root, app_state=self.state)
-            self.root.wait_window(calc_root)
-            # 关闭后同步
-            self._invalidate_ctx_cache()
-            self._mark_dirty()
-            self._refresh_tree()
-            self._restore_selection()
-            self._set_status("参数已同步（未保存）")
         except Exception as e:
+            _safe_close_modal(calc_root, self.root)
             messagebox.showerror("启动失败", f"无法打开工艺计算:\n{e}")
+            return
+        # 在 app 初始化完成后设置模态（app 内部也会设置 protocol，以 app 内部为准）
+        calc_root.transient(self.root)
+        calc_root.grab_set()
+        self.root.wait_window(calc_root)
+        # 关闭后同步
+        self._invalidate_ctx_cache()
+        self._mark_dirty()
+        self._refresh_tree()
+        self._restore_selection()
+        self._set_status("参数已同步（未保存）")
 
 
 # ──────────────────────────────────────────────

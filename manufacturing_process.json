@@ -13,27 +13,10 @@
   },
   {
     "bay": "球面",
-    "process": "点胶",
-    "obj": "S2",
-    "requires": [
-      "S2面点胶"
-    ]
-  },
-  {
-    "bay": "球面",
-    "process": "上盘",
+    "process": "精磨",
     "obj": "S1",
     "requires": [
-      "S1面上盘"
-    ]
-  },
-  {
-    "bay": "球面",
-    "process": "细磨",
-    "obj": "S1",
-    "requires": [
-      "侧面作箭头，指向S2",
-      "细磨S1面，磨砂量约${grinding_s1}"
+      "精磨S1面，精磨量约0.18"
     ]
   },
   {
@@ -44,7 +27,7 @@
       "CA：＞Φ${CA_S1_strict}（加严）",
       "${N_S1} ${IRR_S1} ${RMS_S1}",
       "控制曲率范围（${r1_lower}～${r1_upper}）",
-      "粗糙度：＜${roughness_s1}",
+      "粗糙度：＜0.8nm",
       "S/D：${SD_S1}"
     ]
   },
@@ -56,16 +39,8 @@
       "CA：＞Φ${CA_S1_strict}（加严）",
       "${N_S1} ${IRR_S1} ${RMS_S1}",
       "控制曲率范围（${r1_lower}～${r1_upper}）",
-      "粗糙度：＜${roughness_s1}",
+      "粗糙度：＜0.8nm",
       "S/D：${SD_S1}"
-    ]
-  },
-  {
-    "bay": "清洗检验",
-    "process": "过程清洗",
-    "obj": "",
-    "requires": [
-      "清洗后无印子"
     ]
   },
   {
@@ -116,7 +91,7 @@
     "requires": [
       "S1：S/D：${SD_S1}（CA＞Φ${CA_S1_strict})",
       "S2：S/D：${SD_S2}（CA＞Φ${CA_S2_strict})",
-      "粗糙度：＜${roughness_s1}",
+      "粗糙度：＜0.8nm",
       "Tc=${tc_polish2}±${tc_tol}（数据一一对应）"
     ]
   },
