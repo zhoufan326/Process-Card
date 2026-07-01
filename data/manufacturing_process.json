@@ -9,7 +9,7 @@
       "3.铣磨R1=${R1}，控制中厚Tc=${tc_mill1}±0.03，铣磨R2=${R2}，控制中厚Tc=${tc_mill2}±0.03，控制等厚差≤0.02",
       "倒角：${chamfer}"
     ],
-    "row_height": 40
+    "row_height": 36
   },
   {
     "bay": "球面",
@@ -17,18 +17,6 @@
     "obj": "S1",
     "requires": [
       "精磨S1面，精磨量约0.18"
-    ]
-  },
-  {
-    "bay": "球面",
-    "process": "抛光",
-    "obj": "S1",
-    "requires": [
-      "CA：＞Φ${CA_S1_strict}（加严）",
-      "${N_S1} ${IRR_S1} ${RMS_S1}",
-      "控制曲率范围（${r1_lower}～${r1_upper}）",
-      "粗糙度：＜0.8nm",
-      "S/D：${SD_S1}"
     ]
   },
   {
@@ -100,14 +88,15 @@
     "process": "磨边",
     "obj": "",
     "requires": [
-      "外径：Φ${D}（-0.01/-0.03）",
       "最宽边厚约6.4",
+      "外径：Φ${D}（-0.01/-0.03）",
       "S1：CA：＞Φ${CA_S1}",
       "S2：CA：＞Φ${CA_S2}",
       "偏心＜${tilt_s1}′",
-      "倒角：${chamfer}",
-      "崩边＜${edge_chip}"
-    ]
+      "崩边＜${edge_chip}",
+      "倒角：${chamfer}"
+    ],
+    "color": "BFBFBF"
   },
   {
     "bay": "清洗检验",

@@ -14,18 +14,31 @@ from dataclasses import dataclass, make_dataclass, field
 
 
 # ═══ 应用根目录（读取 vs 写入路径分离） ═══
+def _project_root() -> str:
+    """项目根目录：src/ 的父目录（开发环境），或 exe 所在目录（打包环境）。"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 def _read_root() -> str:
-    """资源读取路径：打包环境=临时解压目录(sys._MEIPASS)，开发环境=项目目录。"""
+    """资源读取路径：打包环境=临时解压目录(sys._MEIPASS)，开发环境=项目根目录。"""
     if getattr(sys, 'frozen', False):
         return sys._MEIPASS
-    return os.path.dirname(os.path.abspath(__file__))
+    return _project_root()
 
 
 def _write_root() -> str:
-    """数据写入路径：打包环境=exe所在目录，开发环境=项目目录。"""
+    """数据写入路径：打包环境=exe所在目录，开发环境=项目根目录。"""
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    return _project_root()
+
+
+def _data_dir(for_write=False) -> str:
+    """JSON 数据文件目录，for_write=True 时返回写入路径。"""
+    base = _write_root() if for_write else _read_root()
+    return os.path.join(base, "data")
 
 
 def _ensure_data_files():
@@ -37,7 +50,16 @@ def _ensure_data_files():
     if src == dst:
         return
     import shutil
+    # 复制 data/ 下的 JSON 文件
     for name in ("field_schema.json", "manufacturing_process.json", "export_layout.json"):
+        dst_path = os.path.join(dst, "data", name)
+        if not os.path.isfile(dst_path):
+            src_path = os.path.join(src, "data", name)
+            if os.path.isfile(src_path):
+                os.makedirs(os.path.join(dst, "data"), exist_ok=True)
+                shutil.copy2(src_path, dst_path)
+    # 复制根目录的 materail.xlsx
+    for name in ("materail.xlsx",):
         dst_path = os.path.join(dst, name)
         if not os.path.isfile(dst_path):
             src_path = os.path.join(src, name)
@@ -48,7 +70,7 @@ def _ensure_data_files():
 # ═══ 加载字段 Schema ═══
 
 def _load_schema() -> dict:
-    path = os.path.join(_read_root(), "field_schema.json")
+    path = os.path.join(_data_dir(), "field_schema.json")
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -278,15 +300,8 @@ def calculate(p: LensParams) -> CalcResult:
 
     # 实际上下限文字
     for side in ('r1', 'r2'):
-        rv = getattr(p, side)
-        prec = getattr(r, f'{side}_sample_precision')
-        if abs(rv) < _SAMPLE_PRECISION_THRESHOLD:
-            text = f"{prec}\u00b5m"
-            setattr(r, f'{side}_actual_upper', text)
-            setattr(r, f'{side}_actual_lower', text)
-        else:
-            setattr(r, f'{side}_actual_upper', f"{getattr(r, f'{side}_upper'):.4f}")
-            setattr(r, f'{side}_actual_lower', f"{getattr(r, f'{side}_lower'):.4f}")
+        setattr(r, f'{side}_actual_upper', f"{getattr(r, f'{side}_upper'):.4f}")
+        setattr(r, f'{side}_actual_lower', f"{getattr(r, f'{side}_lower'):.4f}")
 
     # ── 偏心 / 面倾斜 ──
     # 面倾斜 X(') = |c / (k × (n-1) × BFL)| × 1000

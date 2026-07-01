@@ -746,7 +746,8 @@
       "source": "result",
       "attr": "r1_sample_precision",
       "fmt": ".1f",
-      "suffix": "µm",
+      "prefix": "",
+      "suffix": "",
       "label": "R1 A级样板精度"
     },
     {
@@ -754,7 +755,8 @@
       "source": "result",
       "attr": "r2_sample_precision",
       "fmt": ".1f",
-      "suffix": "µm",
+      "prefix": "",
+      "suffix": "",
       "label": "R2 A级样板精度"
     },
     {

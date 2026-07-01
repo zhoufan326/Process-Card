@@ -11,18 +11,17 @@ r"""工艺卡片 Excel 生成器。
 """
 
 import json, os, datetime, re
-from typing import Optional
 
 import openpyxl
 from openpyxl.styles import PatternFill, Alignment, Border, Side, Font
 from openpyxl.utils import get_column_letter
 
-from lens_calc import LensParams, CalcResult, calculate, _read_root
+from lens_calc import LensParams, CalcResult, calculate, _read_root, _data_dir
 
 
 # ═══ 加载布局 JSON ═══
 def _load_layout() -> dict:
-    p = os.path.join(_read_root(), "export_layout.json")
+    p = os.path.join(_data_dir(), "export_layout.json")
     with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -30,7 +29,7 @@ _LAYOUT = _load_layout()
 
 # ═══ 加载 Schema（用于 _make_ctx） ═══
 def _load_schema() -> dict:
-    p = os.path.join(_read_root(), "field_schema.json")
+    p = os.path.join(_data_dir(), "field_schema.json")
     with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -178,9 +177,7 @@ def _render_footer(ws, ctx, last_row):
 
 
 def _apply_all_borders(ws):
-    """对工作表中所有单元格重新应用完整边框，解决合并区域边框丢失的问题。"""
-    if ws.max_row is None or ws.max_column is None:
-        return
+    """对工作表中所有单元格重新应用完整边框。"""
     for r in range(1, ws.max_row + 1):
         for c in range(1, ws.max_column + 1):
             cell = ws.cell(row=r, column=c)
@@ -239,7 +236,11 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None, 
         bay = g.bay.strip()
         proc = g.process.strip()
         obj = g.obj.strip() if g.obj else ""
-        fill = bf.setdefault(bay, _bay_fill(bay))
+        # 颜色优先级：自定义 > 按车间匹配
+        if g.color:
+            fill = PatternFill(start_color=g.color, end_color=g.color, fill_type="solid")
+        else:
+            fill = bf.setdefault(bay, _bay_fill(bay))
         seq += 1
         gs = row
         for i, rt in enumerate(g.requires):

@@ -26,18 +26,18 @@ VERSION = _get_version()
 
 # ── 数据文件（会随 exe 一并分发） ──
 DATAS = [
-    (_p("field_schema.json"), "."),
-    (_p("manufacturing_process.json"), "."),
-    (_p("export_layout.json"), "."),
-    (_p("materail.xlsx"), "."),
+    (os.path.join(PROJ_DIR, "data", "field_schema.json"), "data"),
+    (os.path.join(PROJ_DIR, "data", "manufacturing_process.json"), "data"),
+    (os.path.join(PROJ_DIR, "data", "export_layout.json"), "data"),
+    (os.path.join(PROJ_DIR, "materail.xlsx"), "."),
 ]
 
 # ── 隐藏导入（确保 PyInstaller 完整打包这些库的所有子模块） ──
 HIDDEN = [
     "openpyxl",
     "matplotlib",
-    "material_db",
-    "app_state",
+    "src.material_db",
+    "src.app_state",
 ]
 
 # ── 明确排除 (避免 matplotlib 拖入 Qt 等) ──
@@ -66,8 +66,8 @@ EXCLUDES = [
 #  单文件模式
 # ═══════════════════════════════════════════════
 a = Analysis(
-    [_p("gui.py")],
-    pathex=[PROJ_DIR],
+    [_p("src/gui.py")],
+    pathex=[PROJ_DIR, os.path.join(PROJ_DIR, "src")],
     binaries=[],
     datas=DATAS,
     hiddenimports=HIDDEN,
