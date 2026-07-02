@@ -243,8 +243,10 @@ def calculate(p: LensParams) -> CalcResult:
     # ── 加严 CA（检测口径按毛坯比例放大）──
     # 加严 CA = 原 CA × 毛坯外径 / 成品外径
     # 例如：CA=44, blank_D=50, D=48 → 加严 CA=44.9
-    r.s1_ca_strict = round(p.s1_ca * (r.blank_diameter - p.pre_edge/2) / p.diameter, 1)
-    r.s2_ca_strict = round(p.s2_ca * (r.blank_diameter - p.pre_edge/2) / p.diameter, 1)
+    raw_s1 = p.s1_ca * (r.blank_diameter - p.pre_edge / 2) / p.diameter
+    raw_s2 = p.s2_ca * (r.blank_diameter - p.pre_edge / 2) / p.diameter
+    r.s1_ca_strict = round(raw_s1, 2)
+    r.s2_ca_strict = round(raw_s2, 2)
 
     # ── 精磨量 / 抛光量拆分 ──
     # polishing 固定为 0.02mm，grinding = grinding_polishing - polishing

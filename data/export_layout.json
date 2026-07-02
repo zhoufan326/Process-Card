@@ -58,6 +58,8 @@
     {"ref": "K5", "value": "＜${edge_chip}",  "style": "bold11"},
     {"ref": "L5", "value": "${chamfer}",     "style": "bold11"},
     {"ref": "N5", "value": "＜${roughness_s2}", "style": "bold11"},
+    {"ref": "J4", "value": "${IRR_S1}\n${RMS_S1}", "style": "bold11"},
+    {"ref": "J5", "value": "${IRR_S2}\n${RMS_S2}", "style": "bold11"},
 
     {"ref": "A6", "value": "镀膜指标",       "style": "bold11", "merge": "A6:A7"},
     {"ref": "B6", "value": "${coating_spec}","style": "lbl",    "merge": "B6:H7"},

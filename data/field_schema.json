@@ -9,7 +9,7 @@
           "attr": "material",
           "label": "透镜材料",
           "type": "str",
-          "default": "Corning 7980 ArF 0C",
+          "default": "CaF2 ArF",
           "_comment": "材料牌号"
         },
         {
@@ -17,7 +17,7 @@
           "label": "R1 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 21.775,
+          "default": 5.0,
           "_comment": "第1面曲率半径"
         },
         {
@@ -25,7 +25,7 @@
           "label": "R2 (曲率半径)",
           "unit": "mm",
           "type": "float",
-          "default": 36.106,
+          "default": 106.4,
           "_comment": "第2面曲率半径"
         },
         {
@@ -33,7 +33,7 @@
           "label": "外径 D",
           "unit": "mm",
           "type": "float",
-          "default": 14.0,
+          "default": 6.6,
           "_comment": "透镜成品外径"
         },
         {
@@ -41,14 +41,14 @@
           "label": "中心厚度 Tc",
           "unit": "mm",
           "type": "float",
-          "default": 4.0,
+          "default": 2.11,
           "_comment": "透镜中心厚度"
         },
         {
           "attr": "n",
           "label": "折射率 n",
           "type": "float",
-          "default": 1.458413,
+          "default": 1.43385,
           "_comment": "设计波长下的折射率"
         },
         {
@@ -78,7 +78,7 @@
           "label": "磨边预扩口径增量",
           "unit": "mm",
           "type": "float",
-          "default": 1.0,
+          "default": 0.6,
           "_comment": "磨边前预留口径余量"
         },
         {
@@ -108,7 +108,7 @@
           "label": "S1面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 0.2,
+          "default": 0.15,
           "_comment": "S1面铣磨材料去除量"
         },
         {
@@ -116,7 +116,7 @@
           "label": "S2面铣磨量",
           "unit": "mm",
           "type": "float",
-          "default": 0.2,
+          "default": 0.15,
           "_comment": "S2面铣磨材料去除量"
         },
         {
@@ -124,7 +124,7 @@
           "label": "S1精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.2,
+          "default": 0.22,
           "_comment": "S1面精磨+抛光总去除量"
         },
         {
@@ -132,7 +132,7 @@
           "label": "S2精磨抛光量",
           "unit": "mm",
           "type": "float",
-          "default": 0.2,
+          "default": 0.22,
           "_comment": "S2面精磨+抛光总去除量"
         }
       ]
@@ -145,46 +145,46 @@
           "attr": "s1_n",
           "label": "S1 光圈数 N",
           "type": "float",
-          "default": 2.0,
+          "default": 3.0,
           "_comment": "S1面牛顿环光圈数"
         },
         {
           "attr": "s1_irr",
           "label": "S1 IRR",
           "unit": "λ",
-          "type": "float",
-          "default": 0.2,
+          "type": "str",
+          "default": "1/8",
           "_comment": "S1面局部光圈不规则度"
         },
         {
           "attr": "s2_n",
           "label": "S2 光圈数 N",
           "type": "float",
-          "default": 2.0,
+          "default": 3.0,
           "_comment": "S2面牛顿环光圈数"
         },
         {
           "attr": "s2_irr",
           "label": "S2 IRR",
           "unit": "λ",
-          "type": "float",
-          "default": 0.2,
+          "type": "str",
+          "default": "1/8",
           "_comment": "S2面局部光圈不规则度"
         },
         {
           "attr": "s1_rms",
           "label": "S1 RMS",
           "unit": "nm",
-          "type": "float",
-          "default": 0.0,
+          "type": "str",
+          "default": "0",
           "_comment": "S1面RMS粗糙度"
         },
         {
           "attr": "s2_rms",
           "label": "S2 RMS",
           "unit": "nm",
-          "type": "float",
-          "default": 0.0,
+          "type": "str",
+          "default": "0",
           "_comment": "S2面RMS粗糙度"
         },
         {
@@ -220,14 +220,14 @@
           "attr": "drawing_no",
           "label": "图号",
           "type": "str",
-          "default": "M0523-G02",
+          "default": "E003622",
           "_comment": "设计图号"
         },
         {
           "attr": "card_no",
           "label": "工艺卡号",
           "type": "str",
-          "default": "NQ0955",
+          "default": "NQ0956",
           "_comment": "工艺卡片编号"
         },
         {
@@ -261,14 +261,14 @@
           "attr": "s1_sd",
           "label": "S1 S/D",
           "type": "str",
-          "default": "20/10",
+          "default": "40/20",
           "_comment": "S1面光洁度等级"
         },
         {
           "attr": "s2_sd",
           "label": "S2 S/D",
           "type": "str",
-          "default": "20/10",
+          "default": "40/20",
           "_comment": "S2面光洁度等级"
         },
         {
@@ -276,7 +276,7 @@
           "label": "S1 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 12.0,
+          "default": 5.28,
           "_comment": "S1面有效检测口径"
         },
         {
@@ -284,7 +284,7 @@
           "label": "S2 CA (检测口径)",
           "unit": "mm",
           "type": "float",
-          "default": 12.0,
+          "default": 5.28,
           "_comment": "S2面有效检测口径"
         },
         {
@@ -299,14 +299,14 @@
           "attr": "chamfer",
           "label": "倒角",
           "type": "str",
-          "default": "(0.2-0.5)x45°",
+          "default": "(0-0.2)x45°",
           "_comment": "倒角规格"
         },
         {
           "attr": "coating_spec",
           "label": "镀膜指标",
           "type": "str",
-          "default": "S1、S2：AR-193.368nm，R＜0.5%@193.368nm，AOI=0°±11°",
+          "default": "S1、S2：AR-193nm±2nm，R＜0.5%@193nm±2nm，AOI=0°±10°",
           "_comment": "镀膜规格要求"
         },
         {
@@ -372,7 +372,7 @@
       "ctx": "${N_S1}",
       "source": "params",
       "attr": "s1_n",
-      "fmt": "s",
+      "fmt": ".1f",
       "prefix": "N：≤",
       "hide_zero": true
     },
@@ -380,7 +380,7 @@
       "ctx": "${N_S2}",
       "source": "params",
       "attr": "s2_n",
-      "fmt": "s",
+      "fmt": ".1f",
       "prefix": "N：≤",
       "hide_zero": true
     },
@@ -462,13 +462,13 @@
       "ctx": "${CA_S1}",
       "source": "params",
       "attr": "s1_ca",
-      "fmt": ".0f"
+      "fmt": "s"
     },
     {
       "ctx": "${CA_S2}",
       "source": "params",
       "attr": "s2_ca",
-      "fmt": ".0f"
+      "fmt": "s"
     },
     {
       "_comment": "加严 CA（按毛坯比例放大）"
@@ -477,14 +477,14 @@
       "ctx": "${CA_S1_strict}",
       "source": "result",
       "attr": "s1_ca_strict",
-      "fmt": ".1f",
+      "fmt": "s",
       "label": "S1 加严 CA"
     },
     {
       "ctx": "${CA_S2_strict}",
       "source": "result",
       "attr": "s2_ca_strict",
-      "fmt": ".1f",
+      "fmt": "s",
       "label": "S2 加严 CA"
     },
     {

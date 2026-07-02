@@ -65,7 +65,7 @@ class AppState:
 
     def __init__(self):
         self.tasks: list[TaskGroup] = []
-        self.lens_params: LensParams = LensParams()
+        self.lens_params = LensParams()  # type: ignore[valid-type]
         self._ctx_cache: dict | None = None
         self._params_path = os.path.join(_data_dir(for_write=True), "user_params.json")
         # ── 版本计数器：每次修改递增，子 UI 异步回调时校验，防竞态 ──
@@ -180,16 +180,14 @@ class AppState:
                 continue
             src = self.lens_params if item["source"] == "params" else r
             val = getattr(src, item["attr"])
-            if item.get("hide_zero"):
+            if item.get("hide_zero") and val:
                 try:
                     if float(val) == 0.0:
                         ctx[item["ctx"]] = ""
                         continue
                 except (ValueError, TypeError):
-                    if not val:
-                        ctx[item["ctx"]] = ""
-                        continue
-            text = str(val) if item["fmt"] == "s" else _remove_trailing_zeros(format(val, item["fmt"]))
+                    pass
+            text = _remove_trailing_zeros(str(val)) if item["fmt"] == "s" else _remove_trailing_zeros(format(val, item["fmt"]))
             if item.get("prefix"):
                 text = item["prefix"] + text
             if item.get("suffix"):

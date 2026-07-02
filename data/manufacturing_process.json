@@ -5,7 +5,7 @@
     "obj": "",
     "requires": [
       "1.材料：${material}",
-      "2.领取平滚件，尺寸：Φ${blank_d}±${blank_d_tol}×${blank_t}±${blank_t_tol}",
+      "2.领取平滚件MP1097，尺寸：Φ${blank_d}±${blank_d_tol}×${blank_t}±${blank_t_tol}",
       "3.铣磨R1=${R1}，控制中厚Tc=${tc_mill1}±0.03，铣磨R2=${R2}，控制中厚Tc=${tc_mill2}±0.03，控制等厚差≤0.02",
       "倒角：${chamfer}"
     ],
@@ -13,22 +13,45 @@
   },
   {
     "bay": "球面",
-    "process": "精磨",
+    "process": "点胶",
     "obj": "S1",
     "requires": [
-      "精磨S1面，精磨量约0.18"
+      "S1面点胶"
+    ]
+  },
+  {
+    "bay": "球面",
+    "process": "上盘",
+    "obj": "S2",
+    "requires": [
+      "S2面上盘，S2面：1+6+12=19，镜盘口径48"
+    ]
+  },
+  {
+    "bay": "球面",
+    "process": "细磨",
+    "obj": "S2",
+    "requires": [
+      "细磨S2面，磨削量约0.2"
     ]
   },
   {
     "bay": "球面",
     "process": "抛光",
-    "obj": "S1",
+    "obj": "S2",
     "requires": [
       "CA：＞Φ${CA_S1_strict}（加严）",
       "${N_S1} ${IRR_S1} ${RMS_S1}",
       "控制曲率范围（${r1_lower}～${r1_upper}）",
-      "粗糙度：＜0.8nm",
       "S/D：${SD_S1}"
+    ]
+  },
+  {
+    "bay": "清洗检验",
+    "process": "过程清洗",
+    "obj": "",
+    "requires": [
+      "清洗后无印子"
     ]
   },
   {
@@ -44,11 +67,10 @@
     "process": "抛光",
     "obj": "S2",
     "requires": [
-      "S/D：${SD_S2}",
       "CA：＞Φ${CA_S2_strict}（加严）",
+      "S/D：${SD_S2}",
       "${N_S2} ${IRR_S2} ${RMS_S2}",
       "控制曲率范围（${r2_lower}～${r2_upper}）",
-      "粗糙度：＜${roughness_s2}",
       "Tc=${tc_polish2}±${tc_tol}"
     ]
   },
@@ -67,7 +89,7 @@
     "requires": [
       "S1曲率范围（${r1_lower}～${r1_upper}）（数据一一对应）",
       "S2曲率范围（${r2_lower}～${r2_upper}）（数据一一对应）",
-      "焦距：${focal}@589nm（抽检）",
+      "焦距：${focal}.072±1%@589nm（抽检）",
       "S1：${IRR_S1} ${RMS_S1}（CA＞Φ${CA_S1_strict}，数据一一对应）",
       "S2：${IRR_S2} ${RMS_S2}（CA＞Φ${CA_S2_strict}，数据一一对应）"
     ]
@@ -79,7 +101,6 @@
     "requires": [
       "S1：S/D：${SD_S1}（CA＞Φ${CA_S1_strict})",
       "S2：S/D：${SD_S2}（CA＞Φ${CA_S2_strict})",
-      "粗糙度：＜0.8nm",
       "Tc=${tc_polish2}±${tc_tol}（数据一一对应）"
     ]
   },
@@ -88,8 +109,8 @@
     "process": "磨边",
     "obj": "",
     "requires": [
-      "最宽边厚约6.4",
-      "外径：Φ${D}（-0.01/-0.03）",
+      "最宽边厚约0.82",
+      "外径：Φ${D}（0/-0.02）",
       "S1：CA：＞Φ${CA_S1}",
       "S2：CA：＞Φ${CA_S2}",
       "偏心＜${tilt_s1}′",
@@ -111,13 +132,7 @@
     "process": "仪器检",
     "obj": "",
     "requires": [
-      "S1：${IRR_S1} ${RMS_S1}（数据一一对应）",
-      "S2：${IRR_S2} ${RMS_S2}（数据一一对应）",
-      "S1曲率范围（${r1_lower}～${r1_upper}）（数据一一对应）",
-      "S2曲率范围（${r2_lower}～${r2_upper}）（数据一一对应）",
-      "焦距${focal}@589nm(抽检)",
-      "偏心＜${tilt_s1}′（数据一一对应）",
-      "侧边打标，箭头指向S2面"
+      "偏心＜${tilt_s1}′（数据一一对应）"
     ]
   },
   {
@@ -138,8 +153,7 @@
     "requires": [
       "S1：S/D：${SD_S1}（CA＞Φ${CA_S1})",
       "S2：S/D：${SD_S2}（CA＞Φ${CA_S2})",
-      "外径：Φ${D}（-0.01/-0.03）（数据一一对应）",
-      "粗糙度：＜${roughness_s1}",
+      "外径：Φ${D}（0/-0.02）（数据一一对应）",
       "倒角：${chamfer}",
       "崩边＜${edge_chip}"
     ]
@@ -153,7 +167,7 @@
       "S1：S/D：${SD_S1}（CA＞Φ${CA_S1})",
       "S2：S/D：${SD_S2}（CA＞Φ${CA_S2})",
       "崩边＜${edge_chip}",
-      "擦镜纸+电容纸包装，供内部使用"
+      "吸塑盒BZ.XSH.E003622包装，入库"
     ]
   }
 ]

@@ -65,16 +65,6 @@ _BAY_C = {"成形": "00B0F0", "球面": "FFC000", "平面": "FFC000",
           "清洗": "FF0000", "镀膜": "00B050"}
 
 
-def _irr_rms_str(irr: float, rms: float) -> str:
-    """面形列：IRR 和 RMS 条件组合。值为 0 时跳过。"""
-    parts = []
-    if irr:
-        parts.append(f"IRR:{irr}\u03bb")
-    if rms:
-        parts.append(f"RMS:{rms:.0f}nm")
-    return ", ".join(parts)
-
-
 def _cell(ws, ref, val, font=None, fill=None, align=_ALIGN_C, border=_BORDER_ALL):
     """写入单元格。ref 为 Excel 引用如 'B3' 或 'AB12'。"""
     col = openpyxl.utils.cell.column_index_from_string(ref.rstrip("0123456789"))
@@ -105,15 +95,13 @@ def _make_ctx(p, r):
             continue
         src = p if item["source"] == "params" else r
         val = getattr(src, item["attr"])
-        if item.get("hide_zero"):
+        if item.get("hide_zero") and val:
             try:
                 if float(val) == 0.0:
                     ctx[item["ctx"]] = ""
                     continue
             except (ValueError, TypeError):
-                if not val:
-                    ctx[item["ctx"]] = ""
-                    continue
+                pass
         text = str(val) if item["fmt"] == "s" else _remove_trailing_zeros(format(val, item["fmt"]))
         if item.get("prefix"):
             text = item["prefix"] + text
@@ -180,8 +168,7 @@ def _apply_all_borders(ws):
     """对工作表中所有单元格重新应用完整边框。"""
     for r in range(1, ws.max_row + 1):
         for c in range(1, ws.max_column + 1):
-            cell = ws.cell(row=r, column=c)
-            cell.border = _BORDER_ALL
+            ws.cell(row=r, column=c).border = _BORDER_ALL
 
 
 # ═══ 主入口 ═══
@@ -226,9 +213,6 @@ def generate_process_card(filepath: str, *, lens_params=None, calc_result=None, 
     # F4 / F5: R值 — R=0 时显示"平面"
     _cell(ws, "F4", _remove_trailing_zeros(f"{p.r1:.3f}") if p.r1 else "平面", font=_STYLE_MAP["bold11"])
     _cell(ws, "F5", _remove_trailing_zeros(f"{p.r2:.3f}") if p.r2 else "平面", font=_STYLE_MAP["bold11"])
-    # J4 / J5: 面形 — 条件组合 IRR + RMS
-    _cell(ws, "J4", _irr_rms_str(p.s1_irr, p.s1_rms), font=_STYLE_MAP["bold11"])
-    _cell(ws, "J5", _irr_rms_str(p.s2_irr, p.s2_rms), font=_STYLE_MAP["bold11"])
 
     # ── 行13+: 工序数据（动态循环，保留原逻辑） ──
     seq, row, bf = 0, 13, {}

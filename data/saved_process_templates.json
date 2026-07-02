@@ -21,6 +21,33 @@
       "requires": [
         "精磨S2面，控制中心厚度${tc_polish2}+${polishing_s2}+${tc_tol}"
       ]
+    },
+    {
+      "name": "点胶",
+      "bay": "球面",
+      "process": "点胶",
+      "obj": "S1",
+      "requires": [
+        "S1面点胶"
+      ]
+    },
+    {
+      "name": "细磨",
+      "bay": "球面",
+      "process": "细磨",
+      "obj": "S1",
+      "requires": [
+        "细磨S2面，磨削量约0.2"
+      ]
+    },
+    {
+      "name": "过程清洗",
+      "bay": "清洗检验",
+      "process": "过程清洗",
+      "obj": "",
+      "requires": [
+        "清洗后无印子"
+      ]
     }
   ]
 }

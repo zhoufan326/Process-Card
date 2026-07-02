@@ -83,6 +83,9 @@ def _safe_close_modal(win, parent=None):
     """安全关闭模态子窗口：先释放 grab，再销毁窗口，最后让父窗口获取焦点。"""
     try:
         win.grab_release()
+    except tk.TclError:
+        pass
+    try:
         win.destroy()
         if parent is not None:
             parent.focus_set()
@@ -113,8 +116,7 @@ def _load_templates() -> list[dict]:
     if not os.path.isfile(TEMPLATE_JSON):
         return []
     with open(TEMPLATE_JSON, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("templates", [])
+        return json.load(f).get("templates", [])
 
 
 def _save_template(name: str, group: TaskGroup):
@@ -238,8 +240,8 @@ class TaskApp:
         self.tree.heading("obj", text="对象")
         self.tree.heading("require", text="要求")
         self.tree.column("#0", width=0, stretch=False)
-        self.tree.column("bay", width=60, anchor="center", stretch=False)
-        self.tree.column("process", width=100, stretch=False)
+        self.tree.column("bay", width=75, anchor="center", stretch=False)
+        self.tree.column("process", width=75, stretch=False)
         self.tree.column("obj", width=50, anchor="center", stretch=False)
         self.tree.column("require", width=400, minwidth=200, stretch=True)
         self.tree.grid(row=0, column=0, columnspan=4, sticky="nswe", padx=2, pady=2)
@@ -1189,18 +1191,11 @@ class TaskApp:
             self._set_status("参数已同步（未保存）")
 
         calc_root = tk.Toplevel(self.root)
-        try:
-            ProcessPlanApp(
-                calc_root,
-                app_state=self.state,
-                on_apply_callback=_on_lens_applied,
-            )
-        except Exception as e:
-            # 错误边界：安全销毁子窗口，释放 grab，防止主窗口卡死
-            _safe_close_modal(calc_root, self.root)
-            messagebox.showerror("启动失败", f"无法打开工艺计算:\n{e}")
-            return
-
+        ProcessPlanApp(
+            calc_root,
+            app_state=self.state,
+            on_apply_callback=_on_lens_applied,
+        )
         calc_root.transient(self.root)
         calc_root.grab_set()
         self.root.wait_window(calc_root)
@@ -1553,6 +1548,9 @@ class ProcessPlanApp:
                 else:
                     raw = widget.get().strip()
                 converter = _TYPE_MAP.get(f["type"], str)
+                # 空字符串时使用 schema 中的默认值，避免 float("") 报错
+                if raw == "" and "default" in f:
+                    raw = str(f["default"])
                 kwargs[f["attr"]] = converter(raw)
         self.state.update_lens_params(**kwargs)
         self._params = self.state.lens_params
